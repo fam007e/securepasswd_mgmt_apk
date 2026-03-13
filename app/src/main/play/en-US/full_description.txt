@@ -1,0 +1,9 @@
+SecurePasswd MGMT is a highly secure, open-source Password and TOTP manager for Android. 
+
+Key Features:
+- **Military-Grade Security**: Uses Argon2id for key derivation with 128MB memory cost.
+- **Privacy First**: Sensitive data is handled in ByteArrays and explicitly zeroed after use.
+- **Zero-Knowledge**: No telemetry, no tracking, and no unexpected network calls.
+- **Modern Interface**: Built with Jetpack Compose for a sleek and intuitive experience.
+- **Cross-Platform Compatibility**: Uses the same core C library as its desktop counterpart for identical security entropy.
+- **Local Sync**: Support for vault synchronization using secure, authenticated encryption.
