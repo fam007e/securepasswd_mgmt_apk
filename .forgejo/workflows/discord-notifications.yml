@@ -15,7 +15,7 @@ on:
 
 jobs:
   notify:
-    runs-on: ubuntu-latest
+    runs-on: codeberg-tiny
     steps:
       - name: Send notification to Discord
         env:
