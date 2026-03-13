@@ -37,21 +37,19 @@ jobs:
         fi
         cmake --version || echo "System cmake not found"
 
+    - name: Install CMake 3.25+
+      run: |
+        sudo apt-get update -y
+        sudo apt-get install -y cmake
+        cmake --version
+
     - name: Create local.properties
       run: |
-        # Use existing ANDROID_HOME or the user's suggested path
         SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+        CMAKE_BIN_DIR=$(dirname $(which cmake))
         echo "sdk.dir=$SDK_PATH" > local.properties
         echo "ndk.version=25.1.8937393" >> local.properties
-        
-        # Discover system cmake to satisfy 3.25+ requirement
-        CMAKE_BIN=$(which cmake || echo "")
-        if [ -n "$CMAKE_BIN" ]; then
-            CMAKE_DIR=$(dirname $(dirname "$CMAKE_BIN"))
-            echo "cmake.dir=$CMAKE_DIR" >> local.properties
-            echo "Found system cmake at $CMAKE_BIN, setting cmake.dir=$CMAKE_DIR"
-        fi
-        
+        echo "cmake.dir=$CMAKE_BIN_DIR" >> local.properties
         echo "--- local.properties ---"
         cat local.properties
 
