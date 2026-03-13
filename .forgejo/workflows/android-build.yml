@@ -26,7 +26,7 @@ jobs:
     - name: Setup Android SDK
       uses: https://github.com/android-actions/setup-android@v3
       with:
-        packages: 'platform-tools ndk;25.1.8937393 cmake;3.26.5'
+        packages: 'platform-tools ndk;25.1.8937393'
 
     - name: Debug Environment
       run: |
@@ -42,7 +42,15 @@ jobs:
         SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
         echo "sdk.dir=$SDK_PATH" > local.properties
         echo "ndk.version=25.1.8937393" >> local.properties
-        echo "cmake.version=3.26.5" >> local.properties
+        
+        # Discover system cmake to satisfy 3.25+ requirement
+        CMAKE_BIN=$(which cmake || echo "")
+        if [ -n "$CMAKE_BIN" ]; then
+            CMAKE_DIR=$(dirname $(dirname "$CMAKE_BIN"))
+            echo "cmake.dir=$CMAKE_DIR" >> local.properties
+            echo "Found system cmake at $CMAKE_BIN, setting cmake.dir=$CMAKE_DIR"
+        fi
+        
         echo "--- local.properties ---"
         cat local.properties
 
@@ -50,9 +58,7 @@ jobs:
       run: chmod +x gradlew
 
     - name: Build with Gradle
-      run: |
-        sed -i 's|path("src/main/cpp/CMakeLists.txt")|&\n            version = "3.26.5"|' app/build.gradle.kts
-        ./gradlew assembleDebug --stacktrace
+      run: ./gradlew assembleDebug --stacktrace
 
     - name: Run Unit Tests
       run: ./gradlew testDebugUnitTest
