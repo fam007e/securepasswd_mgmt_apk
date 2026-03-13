@@ -1,0 +1,79 @@
+name: Discord Webhook Notification
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, closed, reopened]
+  pull_request_review:
+    types: [submitted, edited, dismissed]
+  issues:
+    types: [opened, closed, reopened]
+  release:
+    types: [released, published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send notification to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+        run: |
+          if [ -z "$DISCORD_WEBHOOK_URL" ]; then
+            echo "DISCORD_WEBHOOK_URL not set, skipping notification."
+            exit 0
+          fi
+
+          EVENT_NAME="${{ github.event_name }}"
+          REPOSITORY="${{ github.repository }}"
+          ACTOR="${{ github.actor }}"
+          SERVER_URL="${{ github.server_url }}"
+          
+          # Forgejo compatible URL construction
+          BASE_URL="$SERVER_URL/$REPOSITORY"
+          
+          case "$EVENT_NAME" in
+            push)
+              SHA="${{ github.sha }}"
+              REF="${{ github.ref_name }}"
+              COMMIT_URL="$BASE_URL/commit/$SHA"
+              CONTENT="🚀 **Push Event** in \`$REPOSITORY\` by **$ACTOR**\n\nBranch: \`$REF\`\nCommit: [\`$SHA\`]($COMMIT_URL)"
+              ;;
+            pull_request)
+              ACTION="${{ github.event.action }}"
+              PR_NUM="${{ github.event.pull_request.number }}"
+              PR_TITLE="${{ github.event.pull_request.title }}"
+              PR_URL="$BASE_URL/pulls/$PR_NUM"
+              CONTENT="📋 **Pull Request ${ACTION^^}** in \`$REPOSITORY\` by **$ACTOR**\n\n[#$PR_NUM: $PR_TITLE]($PR_URL)"
+              ;;
+            issues)
+              ACTION="${{ github.event.action }}"
+              ISSUE_NUM="${{ github.event.issue.number }}"
+              ISSUE_TITLE="${{ github.event.issue.title }}"
+              ISSUE_URL="$BASE_URL/issues/$ISSUE_NUM"
+              CONTENT="🐛 **Issue ${ACTION^^}** in \`$REPOSITORY\` by **$ACTOR**\n\n[#$ISSUE_NUM: $ISSUE_TITLE]($ISSUE_URL)"
+              ;;
+            release)
+              ACTION="${{ github.event.action }}"
+              REL_NAME="${{ github.event.release.name }}"
+              REL_TAG="${{ github.event.release.tag_name }}"
+              REL_URL="$BASE_URL/releases/tag/$REL_TAG"
+              CONTENT="🎉 **Release ${ACTION^^}** in \`$REPOSITORY\`\n\n[$REL_NAME ($REL_TAG)]($REL_URL)"
+              ;;
+            pull_request_review)
+              STATE="${{ github.event.review.state }}"
+              PR_NUM="${{ github.event.pull_request.number }}"
+              PR_TITLE="${{ github.event.pull_request.title }}"
+              PR_URL="$BASE_URL/pulls/$PR_NUM"
+              CONTENT="👀 **Pull Request Review [${STATE^^}]** in \`$REPOSITORY\` by **$ACTOR**\n\n[#$PR_NUM: $PR_TITLE]($PR_URL)"
+              ;;
+            *)
+              CONTENT="activity in \`$REPOSITORY\`: **$EVENT_NAME**"
+              ;;
+          esac
+
+          PAYLOAD=$(jq -n --arg content "$CONTENT" '{"content": $content}')
+          curl -X POST -H "Content-Type: application/json" -d "$PAYLOAD" "$DISCORD_WEBHOOK_URL"

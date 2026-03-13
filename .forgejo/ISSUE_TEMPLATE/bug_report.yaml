@@ -1,0 +1,41 @@
+name: Bug Report
+description: Create a bug report to help us improve SecurePasswd_MGMT_APK
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please review [SECURITY.md](../SECURITY.md) before reporting security flaws.
+  - type: input
+    id: version
+    attributes:
+      label: App Version
+      description: What version of the app are you running? (e.g., v1.0.0-beta)
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android Version
+      description: e.g. Google Pixel 7 Pro, Android 13
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: Please describe the bug clearly and concisely.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: What steps do we need to take to reproduce this issue?
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / Screenshots
+      description: Please paste any logcat output or attach screenshots here.
