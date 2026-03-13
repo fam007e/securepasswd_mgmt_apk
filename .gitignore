@@ -1,35 +1,67 @@
+# ---> General
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+
 # ---> Android
-# Gradle files
 .gradle/
 build/
-
-# Local configuration file (sdk path, etc)
-local.properties
-
-# Log/OS Files
-*.log
-
-# Android Studio generated files and folders
 captures/
 .externalNativeBuild/
 .cxx/
 *.apk
 output.json
 
-# IntelliJ
-*.iml
+# Local configuration
+local.properties
 .idea/
-misc.xml
-deploymentTargetDropDown.xml
-render.experimental.xml
+*.iml
+*.iws
 
-# Keystore files
+# Android Studio specific
+.idea/assetWizardSettings.xml
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+.idea/modules/
+.idea/deploymentTargetDropDown.xml
+.idea/render.experimental.xml
+
+# ---> C++/NDK
+compile_commands.json
+.cache/
+.clangd/
+
+# ---> System/Build
+*.log
+*.tmp
+*.bak
+*.swp
+*~
+
+# ---> Secrets (MANDATORY)
 *.jks
 *.keystore
-
-# Google Services (e.g. APIs or Firebase)
+*.p12
+*.pfx
+*.pem
+*.der
 google-services.json
 
-# Android Profiling
-*.hprof
+# ---> App Specific Staging
+app/src/main/assets/vault_sync_staging.db
+app/src/main/assets/vault_sync_staging.db.salt
+vault_sync_staging.db
+vault_sync_staging.db.salt
 
+# ---> Python/Scratch
+__pycache__/
+*.py[cod]
+*$py.class
+parse_migration.py
+qr_test.py
