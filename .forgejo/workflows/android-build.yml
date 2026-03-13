@@ -26,7 +26,7 @@ jobs:
     - name: Setup Android SDK
       uses: https://github.com/android-actions/setup-android@v3
       with:
-        packages: 'platform-tools ndk;25.1.8937393'
+        packages: 'platform-tools ndk;25.1.8937393 cmake;3.22.1'
 
     - name: Debug Environment
       run: |
@@ -35,21 +35,12 @@ jobs:
         if [ -d "$ANDROID_HOME/cmdline-tools" ]; then
           find "$ANDROID_HOME/cmdline-tools" -name "sdkmanager" -exec {} --list \; || true
         fi
-        cmake --version || echo "System cmake not found"
-
-    - name: Install CMake 3.25+
-      run: |
-        sudo apt-get update -y
-        sudo apt-get install -y cmake
-        cmake --version
 
     - name: Create local.properties
       run: |
         SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
-        CMAKE_BIN_DIR=$(dirname $(which cmake))
         echo "sdk.dir=$SDK_PATH" > local.properties
         echo "ndk.version=25.1.8937393" >> local.properties
-        echo "cmake.dir=$CMAKE_BIN_DIR" >> local.properties
         echo "--- local.properties ---"
         cat local.properties
 
