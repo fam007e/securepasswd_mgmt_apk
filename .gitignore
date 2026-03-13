@@ -65,3 +65,6 @@ __pycache__/
 *$py.class
 parse_migration.py
 qr_test.py
+
+# ---> Distribution
+DISTRIBUTION.md
