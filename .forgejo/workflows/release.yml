@@ -8,6 +8,7 @@ on:
 jobs:
   release:
     runs-on: codeberg-medium
+    timeout-minutes: 120
     steps:
       - uses: https://github.com/actions/checkout@v4
         with:

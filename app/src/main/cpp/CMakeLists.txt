@@ -11,9 +11,8 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/P-H-C/phc-winner-argon2.git
     GIT_TAG        master
 )
-FetchContent_GetProperties(argon2)
-if(NOT argon2_POPULATED)
-    FetchContent_Populate(argon2)
+FetchContent_MakeAvailable(argon2)
+if(NOT TARGET argon2)
     add_library(argon2 STATIC
         ${argon2_SOURCE_DIR}/src/argon2.c
         ${argon2_SOURCE_DIR}/src/core.c
@@ -30,22 +29,14 @@ FetchContent_Declare(
     openssl_cmake
     URL https://github.com/jimmy-park/openssl-cmake/archive/refs/tags/3.6.1.tar.gz
 )
-FetchContent_GetProperties(openssl_cmake)
-if(NOT openssl_cmake_POPULATED)
-    FetchContent_Populate(openssl_cmake)
-endif()
-
-add_subdirectory(${openssl_cmake_SOURCE_DIR} ${openssl_cmake_BINARY_DIR})
+FetchContent_MakeAvailable(openssl_cmake)
 
 # Fetch SQLCipher amalgamation (using user-suggested ZIP)
 FetchContent_Declare(
     sqlcipher
     URL https://github.com/chehrlic/sqlcipher-amalgamation/archive/refs/tags/v4.13.0.tar.gz
 )
-FetchContent_GetProperties(sqlcipher)
-if(NOT sqlcipher_POPULATED)
-    FetchContent_Populate(sqlcipher)
-endif()
+FetchContent_MakeAvailable(sqlcipher)
 
 # Shared sources for our core
 add_library(${CMAKE_PROJECT_NAME} SHARED

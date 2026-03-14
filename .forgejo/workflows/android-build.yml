@@ -10,6 +10,7 @@ jobs:
   build:
 
     runs-on: codeberg-medium
+    timeout-minutes: 120
 
     steps:
     - uses: https://github.com/actions/checkout@v4
@@ -48,7 +49,7 @@ jobs:
       run: chmod +x gradlew
 
     - name: Build with Gradle
-      run: ./gradlew :app:assembleDebug --stacktrace
+      run: ./gradlew :app:assembleDebug -Pandroid.bundle.enableUncompressedNativeLibs=false -Pandroid.injected.abi.requested=arm64-v8a,x86_64 --stacktrace
 
     - name: Run Unit Tests
       run: ./gradlew :app:testDebugUnitTest
