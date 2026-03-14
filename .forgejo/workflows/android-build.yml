@@ -49,7 +49,7 @@ jobs:
       run: chmod +x gradlew
 
     - name: Build with Gradle
-      run: ./gradlew :app:assembleDebug -Pandroid.bundle.enableUncompressedNativeLibs=false -Pandroid.injected.abi.requested=arm64-v8a,x86_64 --stacktrace
+      run: ./gradlew :app:assembleDebug -Pandroid.injected.abi.requested=arm64-v8a,x86_64 --stacktrace
 
     - name: Run Unit Tests
       run: ./gradlew :app:testDebugUnitTest
