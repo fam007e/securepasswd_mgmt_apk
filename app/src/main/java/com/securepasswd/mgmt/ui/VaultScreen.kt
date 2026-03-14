@@ -1,8 +1,12 @@
+@file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.securepasswd.mgmt.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,16 +16,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.securepasswd.mgmt.PasswordEntry
 import com.securepasswd.mgmt.HealthCheckLogic
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.ExperimentalFoundationApi
+import com.securepasswd.mgmt.PasswordEntry
+import com.securepasswd.mgmt.R
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VaultScreen(
     entries: List<PasswordEntry>,
@@ -43,9 +46,7 @@ fun VaultScreen(
     var selectedIds by remember { mutableStateOf(emptySet<Int>()) }
 
     // ── Delete-confirm state ────────────────────────────────────────────────
-    // Single-entry delete (swipe or delete while in multi-select)
     var entryPendingDelete by remember { mutableStateOf<PasswordEntry?>(null) }
-    // Bulk delete confirmation
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
 
     // Exit multi-select on back press
@@ -55,8 +56,7 @@ fun VaultScreen(
     }
 
     // ── Single-delete confirmation dialog ───────────────────────────────────
-    val pending = entryPendingDelete
-    if (pending != null) {
+    entryPendingDelete?.let { pending ->
         AlertDialog(
             onDismissRequest = { entryPendingDelete = null },
             title = { Text("Delete entry?") },
@@ -78,15 +78,19 @@ fun VaultScreen(
         val count = selectedIds.size
         AlertDialog(
             onDismissRequest = { showBulkDeleteDialog = false },
-            title = { Text("Delete $count ${if (count == 1) "entry" else "entries"}?") },
-            text = { Text("This will permanently delete the selected ${if (count == 1) "entry" else "entries"} and cannot be undone.") },
+            title = {
+                Text("Delete $count ${if (count == 1) "entry" else "entries"}?")
+            },
+            text = {
+                Text("This will permanently delete the selected ${if (count == 1) "entry" else "entries"} and cannot be undone.")
+            },
             confirmButton = {
                 TextButton(onClick = {
                     val toDelete = entries.filter { it.id in selectedIds }
                     toDelete.forEach { onEntryDelete(it) }
                     showBulkDeleteDialog = false
                     isMultiSelectMode = false
-                    selectedIds = emptySet<Int>()
+                    selectedIds = emptySet()
                 }) { Text("Delete", color = Color.Red) }
             },
             dismissButton = {
@@ -98,18 +102,17 @@ fun VaultScreen(
     Scaffold(
         topBar = {
             if (isMultiSelectMode) {
-                // ── Multi-select action bar ─────────────────────────────────
                 TopAppBar(
-                    title = { Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold) },
+                    title = {
+                        Text("${selectedIds.size} selected", fontWeight = FontWeight.Bold)
+                    },
                     navigationIcon = {
                         IconButton(onClick = {
                             isMultiSelectMode = false
                             selectedIds = emptySet()
                         }) {
                             Icon(
-                                painter = androidx.compose.ui.res.painterResource(
-                                    id = com.securepasswd.mgmt.R.drawable.ic_arrow_back_custom
-                                ),
+                                painter = painterResource(id = R.drawable.ic_arrow_back_custom),
                                 contentDescription = "Exit selection",
                                 tint = colors.onBackground,
                                 modifier = Modifier.size(24.dp)
@@ -117,10 +120,9 @@ fun VaultScreen(
                         }
                     },
                     actions = {
-                        // Select / deselect all
                         TextButton(onClick = {
                             selectedIds = if (selectedIds.size == entries.size) {
-                                emptySet<Int>()
+                                emptySet()
                             } else {
                                 entries.map { it.id }.toSet()
                             }
@@ -131,34 +133,30 @@ fun VaultScreen(
                                 fontSize = 13.sp
                             )
                         }
-                        // Health check selected
                         IconButton(
                             onClick = {
                                 val selected = entries.filter { it.id in selectedIds }
                                 onBulkHealthCheck(selected)
                                 isMultiSelectMode = false
-                                selectedIds = emptySet<Int>()
+                                selectedIds = emptySet()
                             },
                             enabled = selectedIds.isNotEmpty()
                         ) {
                             Icon(
-                                painter = androidx.compose.ui.res.painterResource(
-                                    id = com.securepasswd.mgmt.R.drawable.ic_health_check_custom
-                                ),
+                                painter = painterResource(id = R.drawable.ic_health_check_custom),
                                 contentDescription = "Health Check Selected",
                                 tint = if (selectedIds.isNotEmpty()) colors.primary else colors.onBackground.copy(alpha = 0.3f),
                                 modifier = Modifier.size(24.dp)
                             )
                         }
-                        // Delete selected
                         IconButton(
-                            onClick = { if (selectedIds.isNotEmpty()) showBulkDeleteDialog = true },
+                            onClick = {
+                                if (selectedIds.isNotEmpty()) showBulkDeleteDialog = true
+                            },
                             enabled = selectedIds.isNotEmpty()
                         ) {
                             Icon(
-                                painter = androidx.compose.ui.res.painterResource(
-                                    id = com.securepasswd.mgmt.R.drawable.ic_delete_custom
-                                ),
+                                painter = painterResource(id = R.drawable.ic_delete_custom),
                                 contentDescription = "Delete Selected",
                                 tint = if (selectedIds.isNotEmpty()) Color.Red else colors.onBackground.copy(alpha = 0.3f),
                                 modifier = Modifier.size(24.dp)
@@ -171,17 +169,15 @@ fun VaultScreen(
                     )
                 )
             } else {
-                // ── Normal top bar ──────────────────────────────────────────
                 TopAppBar(
-                    title = { Text("Your Vault", fontWeight = FontWeight.Bold) },
+                    title = {
+                        Text("Your Vault", fontWeight = FontWeight.Bold)
+                    },
                     actions = {
                         IconButton(onClick = onToggleTheme) {
                             Icon(
-                                painter = androidx.compose.ui.res.painterResource(
-                                    id = if (isDarkTheme)
-                                        com.securepasswd.mgmt.R.drawable.ic_lightmode_custom
-                                    else
-                                        com.securepasswd.mgmt.R.drawable.ic_darkmode_custom
+                                painter = painterResource(
+                                    id = if (isDarkTheme) R.drawable.ic_lightmode_custom else R.drawable.ic_darkmode_custom
                                 ),
                                 contentDescription = if (isDarkTheme) "Switch to Light" else "Switch to Dark",
                                 tint = colors.onBackground,
@@ -190,18 +186,14 @@ fun VaultScreen(
                         }
                         IconButton(onClick = onExport) {
                             Icon(
-                                painter = androidx.compose.ui.res.painterResource(
-                                    id = com.securepasswd.mgmt.R.drawable.ic_export_custom
-                                ),
+                                painter = painterResource(id = R.drawable.ic_export_custom),
                                 contentDescription = "Export Vault",
                                 tint = colors.onBackground
                             )
                         }
                         IconButton(onClick = onSync) {
                             Icon(
-                                painter = androidx.compose.ui.res.painterResource(
-                                    id = com.securepasswd.mgmt.R.drawable.ic_sync_custom
-                                ),
+                                painter = painterResource(id = R.drawable.ic_sync_custom),
                                 contentDescription = "Sync from Desktop",
                                 tint = colors.onBackground,
                                 modifier = Modifier.size(24.dp)
@@ -223,9 +215,7 @@ fun VaultScreen(
                     contentColor = colors.onPrimary
                 ) {
                     Icon(
-                        painter = androidx.compose.ui.res.painterResource(
-                            id = com.securepasswd.mgmt.R.drawable.ic_add_custom
-                        ),
+                        painter = painterResource(id = R.drawable.ic_add_custom),
                         contentDescription = "Add Entry",
                         modifier = Modifier.size(24.dp)
                     )
@@ -233,10 +223,10 @@ fun VaultScreen(
             }
         },
         containerColor = colors.background
-    ) { padding ->
+    ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
-                .padding(padding)
+                .padding(innerPadding)
                 .fillMaxSize()
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -246,7 +236,6 @@ fun VaultScreen(
                 val isSelected = entry.id in selectedIds
 
                 if (isMultiSelectMode) {
-                    // ── In multi-select: no swipe, tap toggles selection ──
                     val totpCode = remember(entry.totpSecret, refreshTrigger) {
                         if (entry.totpSecret.isNotEmpty()) totpViewModel.getTotp(entry.totpSecret) else ""
                     }
@@ -265,38 +254,27 @@ fun VaultScreen(
                         },
                         isSelected = isSelected,
                         onClick = {
-                            val id: Int = entry.id
-                            selectedIds = if (isSelected) {
-                                selectedIds - id
-                            } else {
-                                selectedIds + id
-                            }
+                            selectedIds = if (isSelected) selectedIds - entry.id else selectedIds + entry.id
                         },
                         onLongPress = {
-                            val id: Int = entry.id
-                            selectedIds = if (isSelected) {
-                                selectedIds - id
-                            } else {
-                                selectedIds + id
-                            }
+                            selectedIds = if (isSelected) selectedIds - entry.id else selectedIds + entry.id
                         }
                     )
                 } else {
-                    // ── Normal mode: swipe-to-delete with confirmation ──────
-                    val dismissState = rememberDismissState(
-                        confirmValueChange = { value ->
-                            if (value == DismissValue.DismissedToStart) {
-                                entryPendingDelete = entry
-                            }
-                            false // always keep card in place; delete only on dialog confirm
-                        }
-                    )
+                    val dismissState = rememberSwipeToDismissBoxState()
 
-                    SwipeToDismiss(
+                    LaunchedEffect(dismissState.targetValue) {
+                        if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) {
+                            entryPendingDelete = entry
+                            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                        }
+                    }
+
+                    SwipeToDismissBox(
                         state = dismissState,
-                        directions = setOf(DismissDirection.EndToStart),
-                        background = {
-                            val color = if (dismissState.dismissDirection == DismissDirection.EndToStart) {
+                        enableDismissFromStartToEnd = false,
+                        backgroundContent = {
+                            val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
                                 Color.Red
                             } else Color.Transparent
 
@@ -308,16 +286,14 @@ fun VaultScreen(
                                 contentAlignment = Alignment.CenterEnd
                             ) {
                                 Icon(
-                                    painter = androidx.compose.ui.res.painterResource(
-                                        id = com.securepasswd.mgmt.R.drawable.ic_delete_custom
-                                    ),
+                                    painter = painterResource(id = R.drawable.ic_delete_custom),
                                     contentDescription = "Delete",
                                     tint = Color.White,
                                     modifier = Modifier.size(24.dp)
                                 )
                             }
                         },
-                        dismissContent = {
+                        content = {
                             val totpCode = remember(entry.totpSecret, refreshTrigger) {
                                 if (entry.totpSecret.isNotEmpty()) totpViewModel.getTotp(entry.totpSecret) else ""
                             }
@@ -338,9 +314,8 @@ fun VaultScreen(
                                 isSelected = false,
                                 onClick = { onEntryClick(entry) },
                                 onLongPress = {
-                                    // Enter multi-select mode and select this entry
                                     isMultiSelectMode = true
-                                    selectedIds = setOf<Int>(entry.id)
+                                    selectedIds = setOf(entry.id)
                                 }
                             )
                         }
@@ -386,7 +361,6 @@ fun VaultItem(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Selection indicator OR service initial avatar
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -398,9 +372,7 @@ fun VaultItem(
             ) {
                 if (isSelected) {
                     Icon(
-                        painter = androidx.compose.ui.res.painterResource(
-                            id = com.securepasswd.mgmt.R.drawable.ic_check_custom
-                        ),
+                        painter = painterResource(id = R.drawable.ic_check_custom),
                         contentDescription = "Selected",
                         tint = colors.onPrimary,
                         modifier = Modifier.size(20.dp)

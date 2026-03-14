@@ -13,17 +13,17 @@ jobs:
         with:
           submodules: recursive
 
-      - name: set up JDK 17
+      - name: set up JDK 25
         uses: https://github.com/actions/setup-java@v4
         with:
-          java-version: '17'
+          java-version: '25'
           distribution: 'temurin'
           cache: gradle
 
       - name: Setup Android SDK
         uses: https://github.com/android-actions/setup-android@v3
         with:
-          packages: 'platform-tools ndk;25.1.8937393 cmake;3.22.1'
+          packages: 'platform-tools platforms;android-36 ndk;25.1.8937393 cmake;3.30.3'
 
       - name: Debug Environment
         run: |
@@ -45,7 +45,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK
-        run: ./gradlew assembleRelease --stacktrace
+        run: ./gradlew :app:assembleRelease --stacktrace
 
       - name: Sign APK
         uses: https://github.com/r0adkll/sign-android-release@v1

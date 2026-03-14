@@ -202,7 +202,7 @@ fun TotpSection(code: String, remainingSeconds: Int, onCopy: () -> Unit) {
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 LinearProgressIndicator(
-                    progress = remainingSeconds / 30f,
+                    progress = { remainingSeconds / 30f },
                     modifier = Modifier.width(120.dp),
                     color = colors.primary,
                     trackColor = colors.surfaceVariant
