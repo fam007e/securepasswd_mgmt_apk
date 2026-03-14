@@ -76,6 +76,15 @@ int database_add_entry(const PasswordEntry *entry);
 int database_update_entry(const PasswordEntry *entry);
 
 /**
+ * @brief Updates only the pwned count for an entry.
+ *
+ * @param id The ID of the entry.
+ * @param pwned_count The new pwned count.
+ * @return 0 on success, -1 on error.
+ */
+int database_update_pwned_count(int id, int pwned_count);
+
+/**
  * @brief Deletes a password entry from the database by its ID.
  *
  * @param id The ID of the entry to delete.

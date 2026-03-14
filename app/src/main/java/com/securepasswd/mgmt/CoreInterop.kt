@@ -35,6 +35,7 @@ object CoreInterop {
         recoveryCodes: ByteArray,
         pwnedCount: Int
     ): Int
+    external fun databaseUpdatePwnedCount(id: Int, pwnedCount: Int): Int
     external fun databaseDeleteEntry(id: Int): Int
     external fun generateTotp(secret: ByteArray): ByteArray
     external fun generatePassword(length: Int, useUpper: Boolean, useNum: Boolean, useSpecial: Boolean): ByteArray

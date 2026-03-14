@@ -28,6 +28,13 @@ extensions.configure<ApplicationExtension>("android") {
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
+                
+                // Allow targeting specific ABIs via command line for faster CI/Dev builds
+                val requestedAbi = project.findProperty("android.injected.abi.requested") as? String
+                    ?: project.findProperty("target.abis") as? String
+                if (requestedAbi != null) {
+                    abiFilters(*requestedAbi.split(",").toTypedArray())
+                }
             }
         }
     }

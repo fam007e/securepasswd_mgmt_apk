@@ -98,6 +98,7 @@ fun AppNavigation(
     // Login: no BackHandler → system default (exits app) ✓
     // Vault: no BackHandler → system default (exits app) ✓  (multi-select back is handled inside VaultScreen)
     BackHandler(enabled = currentScreen is Screen.Details) {
+        (currentScreen as? Screen.Details)?.entry?.wipe()
         entries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
         currentScreen = Screen.Vault
     }
@@ -143,30 +144,33 @@ fun AppNavigation(
                 entries = entries,
                 onAddEntry = { currentScreen = Screen.AddEntry },
                 onEntryClick = { entry ->
-                    val fullEntry = CoreInterop.databaseGetEntry(entry.id)
-                    if (fullEntry != null) {
-                        currentScreen = Screen.Details(fullEntry)
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val fullEntry = CoreInterop.databaseGetEntry(entry.id)
+                        withContext(Dispatchers.Main) {
+                            if (fullEntry != null) {
+                                currentScreen = Screen.Details(fullEntry)
+                            } else {
+                                Toast.makeText(context, "Error loading entry", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                 },
                 onExport = onExport,
                 onSync = { currentScreen = Screen.Sync },
                 onEntryDelete = { entry ->
-                    CoreInterop.databaseDeleteEntry(entry.id)
-                    entries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        CoreInterop.databaseDeleteEntry(entry.id)
+                        val updatedEntries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
+                        withContext(Dispatchers.Main) {
+                            entries = updatedEntries
+                        }
+                    }
                 },
                 onBulkHealthCheck = { selectedEntries ->
                     lifecycleScope.launch(Dispatchers.IO) {
                         selectedEntries.forEach { entry ->
                             val count = HealthCheckLogic.checkPwned(entry.password)
-                            CoreInterop.databaseUpdateEntry(
-                                entry.id,
-                                entry.service,
-                                entry.username,
-                                entry.password,
-                                entry.totpSecret,
-                                entry.recoveryCodes,
-                                count
-                            )
+                            CoreInterop.databaseUpdatePwnedCount(entry.id, count)
                         }
                         withContext(Dispatchers.Main) {
                             entries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
@@ -181,18 +185,26 @@ fun AppNavigation(
             AddEntryScreen(
                 allEntries = entries,
                 onSave = { service, username, password, totpSecret, recoveryCodes, pwnedCount ->
-                    val pBytes = password.toByteArray(Charsets.UTF_8)
-                    val tBytes = totpSecret.toByteArray(Charsets.UTF_8)
-                    val rBytes = recoveryCodes.toByteArray(Charsets.UTF_8)
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val pBytes = password.toByteArray(Charsets.UTF_8)
+                        val tBytes = totpSecret.toByteArray(Charsets.UTF_8)
+                        val rBytes = recoveryCodes.toByteArray(Charsets.UTF_8)
 
-                    CoreInterop.databaseAddEntry(service, username, pBytes, tBytes, rBytes, pwnedCount)
+                        val result = CoreInterop.databaseAddEntry(service, username, pBytes, tBytes, rBytes, pwnedCount)
 
-                    pBytes.fill(0)
-                    tBytes.fill(0)
-                    rBytes.fill(0)
+                        pBytes.fill(0)
+                        tBytes.fill(0)
+                        rBytes.fill(0)
 
-                    entries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
-                    currentScreen = Screen.Vault
+                        withContext(Dispatchers.Main) {
+                            if (result > 0) {
+                                entries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
+                                currentScreen = Screen.Vault
+                            } else {
+                                Toast.makeText(context, "Failed to save entry", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
                 },
                 onBack = { currentScreen = Screen.Vault }
             )
@@ -213,22 +225,30 @@ fun AppNavigation(
                 entry = screen.entry,
                 allEntries = entries,
                 onSave = { id, service, username, password, totpSecret, recoveryCodes, pwnedCount ->
-                    val pBytes = password.toByteArray(Charsets.UTF_8)
-                    val tBytes = totpSecret.toByteArray(Charsets.UTF_8)
-                    val rBytes = recoveryCodes.toByteArray(Charsets.UTF_8)
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        val pBytes = password.toByteArray(Charsets.UTF_8)
+                        val tBytes = totpSecret.toByteArray(Charsets.UTF_8)
+                        val rBytes = recoveryCodes.toByteArray(Charsets.UTF_8)
 
-                    CoreInterop.databaseUpdateEntry(id, service, username, pBytes, tBytes, rBytes, pwnedCount)
+                        val result = CoreInterop.databaseUpdateEntry(id, service, username, pBytes, tBytes, rBytes, pwnedCount)
 
-                    pBytes.fill(0)
-                    tBytes.fill(0)
-                    rBytes.fill(0)
+                        pBytes.fill(0)
+                        tBytes.fill(0)
+                        rBytes.fill(0)
 
-                    entries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
-                    val fullEntry = CoreInterop.databaseGetEntry(id)
-                    if (fullEntry != null) {
-                        currentScreen = Screen.Details(fullEntry)
-                    } else {
-                        currentScreen = Screen.Vault
+                        withContext(Dispatchers.Main) {
+                            if (result == 0) {
+                                entries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
+                                val fullEntry = CoreInterop.databaseGetEntry(id)
+                                if (fullEntry != null) {
+                                    currentScreen = Screen.Details(fullEntry)
+                                } else {
+                                    currentScreen = Screen.Vault
+                                }
+                            } else {
+                                Toast.makeText(context, "Failed to update entry", Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                 },
                 onBack = { currentScreen = Screen.Details(screen.entry) }

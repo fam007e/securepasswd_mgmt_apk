@@ -3,7 +3,11 @@
 #endif
 #include "database.h"
 #include "key_derivation.h"
-#include <sqlite3.h>
+#include "sqlite3.h"
+
+// Explicitly declare SQLCipher extensions if not picked up from header
+SQLITE_API int sqlite3_key(sqlite3 *db, const void *pKey, int nKey);
+SQLITE_API int sqlite3_rekey(sqlite3 *db, const void *pKey, int nKey);
 
 // SQLCipher functions are now provided by the linked library
 
@@ -21,6 +25,8 @@ static int initialize_schema();
 
 
 int database_open(const char *db_path, const char *password) {
+    database_close(); // Ensure any previously open database is closed
+
     if (!db_path) {
         return -1;
     }
@@ -58,6 +64,9 @@ int database_open(const char *db_path, const char *password) {
         sodium_memzero(key, KEY_LEN);
         return -1;
     }
+
+    // Handle busy locks from concurrent background operations
+    sqlite3_busy_timeout(db, 5000);
 
 
     // Test if the key is correct by trying to access the database
@@ -214,11 +223,11 @@ int database_add_entry(const PasswordEntry *entry) {
         return -1;
     }
 
-    sqlite3_bind_text(stmt, 1, entry->service, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, entry->username, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, entry->password, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, entry->totp_secret, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 5, entry->recovery_codes, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, entry->service, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, entry->username, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, entry->password, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, entry->totp_secret, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, entry->recovery_codes, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt, 6, entry->pwned_count);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
@@ -241,16 +250,39 @@ int database_update_entry(const PasswordEntry *entry) {
         return -1;
     }
 
-    sqlite3_bind_text(stmt, 1, entry->service, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 2, entry->username, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 3, entry->password, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 4, entry->totp_secret, -1, SQLITE_STATIC);
-    sqlite3_bind_text(stmt, 5, entry->recovery_codes, -1, SQLITE_STATIC);
+    sqlite3_bind_text(stmt, 1, entry->service, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, entry->username, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, entry->password, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, entry->totp_secret, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, entry->recovery_codes, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt, 6, entry->pwned_count);
     sqlite3_bind_int(stmt, 7, entry->id);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
         fprintf(stderr, "Failed to execute statement: %s\n", sqlite3_errmsg(db)); // flawfinder: ignore
+        sqlite3_finalize(stmt);
+        return -1;
+    }
+
+    sqlite3_finalize(stmt);
+    return 0;
+}
+
+int database_update_pwned_count(int id, int pwned_count) {
+    if (!db) return -1;
+
+    sqlite3_stmt *stmt;
+    const char *sql = "UPDATE passwords SET pwned_count = ? WHERE id = ?;";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        fprintf(stderr, "Failed to prepare pwned update: %s\n", sqlite3_errmsg(db)); // flawfinder: ignore
+        return -1;
+    }
+
+    sqlite3_bind_int(stmt, 1, pwned_count);
+    sqlite3_bind_int(stmt, 2, id);
+
+    if (sqlite3_step(stmt) != SQLITE_DONE) {
+        fprintf(stderr, "Failed to execute pwned update: %s\n", sqlite3_errmsg(db)); // flawfinder: ignore
         sqlite3_finalize(stmt);
         return -1;
     }

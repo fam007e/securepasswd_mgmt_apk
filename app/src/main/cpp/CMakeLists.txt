@@ -62,10 +62,10 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
+    ${sqlcipher_SOURCE_DIR}
     ${CORE_DIR}
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${argon2_SOURCE_DIR}/include
-    ${sqlcipher_SOURCE_DIR}
 )
 
 target_link_libraries(${CMAKE_PROJECT_NAME}

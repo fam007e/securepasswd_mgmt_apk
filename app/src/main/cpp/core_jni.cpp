@@ -1,6 +1,6 @@
 #include <jni.h>
-#include <string> // This is used by std::string hello = "SecurePasswd MGMT Core Loaded";
-// Include your core headers
+#include <string> 
+#include <android/log.h>
 #include <sodium.h>
 extern "C" {
 #include "core/database.h"
@@ -32,11 +32,14 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseOpen(
     pass_cstr[pass_len] = '\0';
 
     int result = database_open(path, pass_cstr);
+    if (result != 0) {
+        __android_log_print(ANDROID_LOG_ERROR, "CoreInterop", "Failed to open database: %d", result);
+    }
 
     sodium_memzero(pass_cstr, pass_len);
     free(pass_cstr);
     sodium_memzero(pass_bytes, pass_len);
-    env->ReleaseByteArrayElements(password, pass_bytes, 0);
+    env->ReleaseByteArrayElements(password, pass_bytes, JNI_ABORT);
     env->ReleaseStringUTFChars(db_path, path);
     return result;
 }
@@ -167,6 +170,9 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseAddEntry(
     entry.pwned_count = pwnedCount;
 
     int result = database_add_entry(&entry);
+    if (result <= 0) {
+        __android_log_print(ANDROID_LOG_ERROR, "CoreInterop", "Failed to add entry: %d", result);
+    }
 
     // entry fields are copied/used by database_add_entry, but we should zero them if they are local copies
     // database_add_entry in this app's core usually strdups if it needs to keep data, 
@@ -177,18 +183,15 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseAddEntry(
     
     sodium_memzero(entry.password, pass_len);
     free(entry.password);
-    sodium_memzero(pass_bytes, pass_len);
-    env->ReleaseByteArrayElements(password, pass_bytes, 0);
+    env->ReleaseByteArrayElements(password, pass_bytes, JNI_ABORT);
 
     sodium_memzero(entry.totp_secret, totp_len);
     free(entry.totp_secret);
-    sodium_memzero(totp_bytes, totp_len);
-    env->ReleaseByteArrayElements(totpSecret, totp_bytes, 0);
+    env->ReleaseByteArrayElements(totpSecret, totp_bytes, JNI_ABORT);
 
     sodium_memzero(entry.recovery_codes, recovery_len);
     free(entry.recovery_codes);
-    sodium_memzero(recovery_bytes, recovery_len);
-    env->ReleaseByteArrayElements(recoveryCodes, recovery_bytes, 0);
+    env->ReleaseByteArrayElements(recoveryCodes, recovery_bytes, JNI_ABORT);
 
     return result;
 }
@@ -231,24 +234,24 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseUpdateEntry(
     entry.pwned_count = pwnedCount;
 
     int result = database_update_entry(&entry);
+    if (result != 0) {
+        __android_log_print(ANDROID_LOG_ERROR, "CoreInterop", "Failed to update entry: %d", result);
+    }
 
     env->ReleaseStringUTFChars(service, entry.service);
     env->ReleaseStringUTFChars(username, entry.username);
     
     sodium_memzero(entry.password, pass_len);
     free(entry.password);
-    sodium_memzero(pass_bytes, pass_len);
-    env->ReleaseByteArrayElements(password, pass_bytes, 0);
+    env->ReleaseByteArrayElements(password, pass_bytes, JNI_ABORT);
 
     sodium_memzero(entry.totp_secret, totp_len);
     free(entry.totp_secret);
-    sodium_memzero(totp_bytes, totp_len);
-    env->ReleaseByteArrayElements(totpSecret, totp_bytes, 0);
+    env->ReleaseByteArrayElements(totpSecret, totp_bytes, JNI_ABORT);
 
     sodium_memzero(entry.recovery_codes, recovery_len);
     free(entry.recovery_codes);
-    sodium_memzero(recovery_bytes, recovery_len);
-    env->ReleaseByteArrayElements(recoveryCodes, recovery_bytes, 0);
+    env->ReleaseByteArrayElements(recoveryCodes, recovery_bytes, JNI_ABORT);
 
     return result;
 }
@@ -291,6 +294,19 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseGetEntry(
 
     free_password_entries(entry, 1);
     return entryObj;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_databaseUpdatePwnedCount(
+        JNIEnv* env,
+        jobject /* this */,
+        jint id,
+        jint pwnedCount) {
+    int result = database_update_pwned_count(id, pwnedCount);
+    if (result != 0) {
+        __android_log_print(ANDROID_LOG_ERROR, "CoreInterop", "Failed to update pwned count: %d", result);
+    }
+    return result;
 }
 
 extern "C" JNIEXPORT jint JNICALL

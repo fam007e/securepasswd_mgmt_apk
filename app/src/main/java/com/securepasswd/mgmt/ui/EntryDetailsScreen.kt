@@ -122,15 +122,7 @@ fun EntryDetailsScreen(
                             val result = HealthCheckLogic.checkPwned(entry.password)
                             pwnedCount = result
                             // Persist the result to database
-                            CoreInterop.databaseUpdateEntry(
-                                entry.id,
-                                entry.service,
-                                entry.username,
-                                entry.password,
-                                entry.totpSecret,
-                                entry.recoveryCodes,
-                                result
-                            )
+                            CoreInterop.databaseUpdatePwnedCount(entry.id, result)
                             
                             isCheckingPwned = false
                         }
