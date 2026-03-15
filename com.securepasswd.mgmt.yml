@@ -1,12 +1,17 @@
 Categories:
   - Security
-  - Utility
+  - System
 License: MIT
 AuthorName: Dark Knightz Inc.
-AuthorEmail: faisalmoshiur+securepasswdmgmtapk@gmail.com
 WebSite: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 SourceCode: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 IssueTracker: https://codeberg.org/fam007e/securepasswd_mgmt_apk/issues
+
+Summary: Secure Password and TOTP Manager
+Description: |
+  A modern, security-focused password and TOTP manager built with Kotlin and C++.
+  It uses SQLCipher for database encryption and supports ABI splitting for
+  optimized performance across different architectures.
 
 RepoType: git
 Repo: https://codeberg.org/fam007e/securepasswd_mgmt_apk
@@ -14,7 +19,7 @@ Repo: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 Builds:
   - versionName: '2026.03.15'
     versionCode: 2026031510
-    commit: 43310064502573d45c50616999a38eb4d56d7eb8
+    commit: v2026.03.15
     subdir: app
     gradle:
       - yes
@@ -23,6 +28,3 @@ AutoUpdateMode: Version
 UpdateCheckMode: Tags
 CurrentVersion: '2026.03.15'
 CurrentVersionCode: 2026031510
-
-AntiFeatures:
-  - NonFreeNet
