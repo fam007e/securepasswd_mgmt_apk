@@ -105,15 +105,13 @@ jobs:
         run: rm -f keystore.jks
 
       - name: Create Release
-        uses: https://github.com/softprops/action-gh-release@v2
+        uses: https://code.forgejo.org/actions/forgejo-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: "signed-apks/*.apk"
-          tag_name: ${{ github.ref_name }}
-          target_commitish: ${{ github.sha }}
-          name: SecurePasswd MGMT ${{ github.ref_name }}
-          draft: false
-          prerelease: false
-          generate_release_notes: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          direction: upload
+          release-dir: signed-apks
+          tag: ${{ github.ref_name }}
+          title: "SecurePasswd MGMT ${{ github.ref_name }}"
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          release-notes-assistant: true
+          override: true
