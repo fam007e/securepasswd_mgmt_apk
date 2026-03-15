@@ -17,7 +17,7 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "com.securepasswd.mgmt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2026031501
+        versionCode = 202603151 // Base version code for ABI splitting logic
         versionName = "2026.03.15"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -36,6 +36,15 @@ extensions.configure<ApplicationExtension>("android") {
                     abiFilters(*requestedAbi.split(",").toTypedArray())
                 }
             }
+        }
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("armeabi-v7a", "arm64-v8a")
+            isUniversalApk = true
         }
     }
 
@@ -66,6 +75,26 @@ extensions.configure<ApplicationExtension>("android") {
         cmake {
             path("src/main/cpp/CMakeLists.txt")
             version = "3.30.3"
+        }
+    }
+
+    // ABI-specific version code logic
+    // Using the project's 'android' extension to access applicationVariants
+    project.extra.set("android.applicationVariants", true) 
+}
+
+// Access applicationVariants to override versionCode for each ABI
+(extensions.getByName("android") as com.android.build.gradle.BaseExtension).apply {
+    (this as com.android.build.gradle.AppExtension).applicationVariants.all {
+        outputs.forEach { output ->
+            val outputImpl = output as com.android.build.gradle.internal.api.ApkVariantOutputImpl
+            val abi = outputImpl.getFilter(com.android.build.OutputFile.ABI)
+            val abiMultiplier = when (abi) {
+                "armeabi-v7a" -> 1
+                "arm64-v8a" -> 2
+                else -> 0 // Universal
+            }
+            outputImpl.versionCodeOverride = (defaultConfig.versionCode ?: 0) * 10 + abiMultiplier
         }
     }
 }
