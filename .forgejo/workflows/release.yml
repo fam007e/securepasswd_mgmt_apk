@@ -9,6 +9,8 @@ jobs:
   release:
     runs-on: codeberg-medium
     timeout-minutes: 180
+    permissions:
+      contents: write
     steps:
       - uses: https://github.com/actions/checkout@v4
         with:
@@ -108,6 +110,7 @@ jobs:
           artifacts: "signed-apks/*.apk"
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ github.ref_name }}
+          commit: ${{ github.sha }}
           name: SecurePasswd MGMT ${{ github.ref_name }}
           allowUpdates: true
           replacesArtifacts: true
