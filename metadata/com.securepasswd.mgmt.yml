@@ -1,9 +1,7 @@
 Categories:
-  - Security
-  - System
+  - Password & 2FA
 License: MIT
 AuthorName: Dark Knightz Inc.
-WebSite: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 SourceCode: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 IssueTracker: https://codeberg.org/fam007e/securepasswd_mgmt_apk/issues
 
@@ -13,14 +11,14 @@ RepoType: git
 Repo: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 
 Builds:
-  - versionName: 2026.03.15
-    versionCode: 202603151
-    commit: v2026.03.15
+  - versionName: 2026.03.16
+    versionCode: 2026031610
+    commit: v2026.03.16
     subdir: app
     gradle:
       - yes
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 2026.03.15
-CurrentVersionCode: 202603151
+CurrentVersion: 2026.03.16
+CurrentVersionCode: 2026031610

@@ -100,22 +100,13 @@ jobs:
         if: always()
         run: rm -f keystore.jks
 
-      - name: Create and upload release
-        uses: https://code.forgejo.org/actions/forgejo-release@v2
+      - name: Create Release
+        uses: https://github.com/softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          direction: upload
-          tag: ${{ github.ref_name }}
-          title: "SecurePasswd MGMT ${{ github.ref_name }}"
-          release-dir: signed-apks
-          token: ${{ secrets.FORGEJO_TOKEN }}
-          override: true
-
-      - name: Cleanup release
-        if: always()
-        uses: https://code.forgejo.org/actions/forgejo-release@v2
-        with:
-          direction: delete
-          tag: ${{ github.ref_name }}
-          token: ${{ secrets.FORGEJO_TOKEN }}     
-          override: true
+          files: |
+            signed-apks/*.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
