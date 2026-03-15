@@ -8,13 +8,14 @@ This Android application promises **identical security entropy** to its desktop 
 * **Argon2id Key Derivation:** Enforces a 128MB memory cost with 3 iterations.
 * **Salt Handling:** Unique salt generation relies exclusively on underlying `/dev/urandom` Linux kernel polling via a `libsodium` shim layer.
 * **Memory Safety:** Sensitive data (passwords, TOTP seeds) is handled in `ByteArray` and explicitly zeroed immediately after use. Master passwords never exist as immutable strings in the JVM heap.
-* **Zero-Knowledge Architecture:** No telemetry, tracking, or unexpected network calls.
+* **Zero-Knowledge Architecture:** No telemetry or tracking.
+* **Password Health Checks:** Uses a privacy-preserving k-anonymity request to the [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords) API. Only the first 5 characters of a SHA-1 hash are sent. (Note: This is a monetary-free but proprietary network service, which F-Droid tags as `NonFreeNet`).
 * **Modern Material UI:** Featuring intuitive desktop-like themes utilizing the Jetpack Compose framework.
 
 ## Build Requirements
 - Android Studio Iguana (or newer)
 - Gradle 8.2+
-- Android NDK `25.1.8937393` and CMake `3.25.1`
+- Android NDK `25.1.8937393` and CMake `3.30.3`
 
 ## Building from source
 ```bash

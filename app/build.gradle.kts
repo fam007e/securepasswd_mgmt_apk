@@ -94,8 +94,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:${cameraxVersion}")
     implementation("androidx.camera:camera-view:${cameraxVersion}")
 
-    // MLKit Barcode
-    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    // ZXing (FOSS-compliant barcode scanning)
+    implementation("com.google.zxing:core:3.5.4")
     implementation("androidx.compose.material:material-icons-extended")
 
     // Force consistent version of concurrent-futures

@@ -27,10 +27,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.google.mlkit.vision.barcode.BarcodeScannerOptions
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.barcode.common.Barcode
-import com.google.mlkit.vision.common.InputImage
+import com.google.zxing.*
+import com.google.zxing.common.HybridBinarizer
+import java.util.*
 import java.util.concurrent.Executors
 
 @Composable
@@ -84,41 +83,46 @@ fun QRScannerView(
                             it.setSurfaceProvider(previewView.surfaceProvider)
                         }
 
-                        val options = BarcodeScannerOptions.Builder()
-                            .setBarcodeFormats(Barcode.FORMAT_ALL_FORMATS)
-                            .build()
-                        val scanner = BarcodeScanning.getClient(options)
+                        // ZXing MultiFormatReader
+                        val reader = MultiFormatReader().apply {
+                            val hints = mutableMapOf<DecodeHintType, Any>()
+                            hints[DecodeHintType.POSSIBLE_FORMATS] = EnumSet.of(BarcodeFormat.QR_CODE)
+                            setHints(hints)
+                        }
+
                         val analysisUseCase = ImageAnalysis.Builder()
                             .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                             .build()
 
                         val executor = Executors.newSingleThreadExecutor()
                         analysisUseCase.setAnalyzer(executor) { imageProxy: ImageProxy ->
-                            @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
-                            val mediaImage = imageProxy.image
-                            if (mediaImage != null) {
-                                val image = InputImage.fromMediaImage(
-                                    mediaImage,
-                                    imageProxy.imageInfo.rotationDegrees
+                            try {
+                                val buffer = imageProxy.planes[0].buffer
+                                val data = ByteArray(buffer.remaining())
+                                buffer.get(data)
+
+                                // ZXing requires a PlanarYUVLuminanceSource
+                                val source = PlanarYUVLuminanceSource(
+                                    data,
+                                    imageProxy.width,
+                                    imageProxy.height,
+                                    0, 0,
+                                    imageProxy.width,
+                                    imageProxy.height,
+                                    false
                                 )
-                                scanner.process(image)
-                                    .addOnSuccessListener { barcodes ->
-                                        for (barcode in barcodes) {
-                                            val value = barcode.rawValue
-                                            if (value != null) {
-                                                onQrCodeScanned(value)
-                                                cameraProvider.unbindAll()
-                                                return@addOnSuccessListener
-                                            }
-                                        }
-                                    }
-                                    .addOnFailureListener {
-                                        Log.e("QRScanner", "Barcode scanning failed", it)
-                                    }
-                                    .addOnCompleteListener {
-                                        imageProxy.close()
-                                    }
-                            } else {
+                                val bitmap = BinaryBitmap(HybridBinarizer(source))
+
+                                try {
+                                    val result = reader.decode(bitmap)
+                                    onQrCodeScanned(result.text)
+                                    cameraProvider.unbindAll()
+                                } catch (e: NotFoundException) {
+                                    // No QR code in this frame
+                                } catch (e: Exception) {
+                                    Log.e("QRScanner", "ZXing decode error", e)
+                                }
+                            } finally {
                                 imageProxy.close()
                             }
                         }
