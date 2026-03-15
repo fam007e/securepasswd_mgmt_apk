@@ -46,7 +46,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK
-        run: ./gradlew :app:assembleRelease --stacktrace
+        run: ./gradlew :app:assembleRelease -Ptarget.abis=arm64-v8a,armeabi-v7a --stacktrace
 
       - name: Sign APK
         uses: https://github.com/r0adkll/sign-android-release@v1
