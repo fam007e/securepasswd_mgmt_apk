@@ -27,6 +27,7 @@ import android.content.Context
 import android.content.ClipData
 import androidx.compose.foundation.isSystemInDarkTheme
 import android.view.WindowManager
+import org.woheller69.freeDroidWarn.FreeDroidWarn
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,6 +35,9 @@ class MainActivity : ComponentActivity() {
 
         // Block screenshots and screen recording for security
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+
+        // FreeDroidWarn check
+        FreeDroidWarn.showWarningOnUpgrade(this, BuildConfig.VERSION_CODE)
 
         // Handle incoming sync file if app was opened via intent
         intent?.data?.let { uri ->

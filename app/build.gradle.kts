@@ -101,6 +101,7 @@ dependencies {
     // Force consistent version of concurrent-futures
     implementation("androidx.concurrent:concurrent-futures:1.2.0")
     implementation("androidx.concurrent:concurrent-futures-ktx:1.2.0")
+    implementation("com.github.woheller69:FreeDroidWarn:V1.2.2")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
