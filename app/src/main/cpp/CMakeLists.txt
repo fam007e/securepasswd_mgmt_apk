@@ -1,42 +1,27 @@
-cmake_minimum_required(VERSION 3.22.1)
+cmake_minimum_required(VERSION 3.25.1)
 project("securepasswd_mgmt_apk")
 
 set(CORE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/core)
+set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external)
 
-include(FetchContent)
-
-# Argon2 is small and easy to build from source
-FetchContent_Declare(
-    argon2
-    GIT_REPOSITORY https://github.com/P-H-C/phc-winner-argon2.git
-    GIT_TAG        master
+# Argon2 (Vendored)
+set(argon2_SOURCE_DIR ${EXTERNAL_DIR}/argon2)
+add_library(argon2 STATIC
+    ${argon2_SOURCE_DIR}/src/argon2.c
+    ${argon2_SOURCE_DIR}/src/core.c
+    ${argon2_SOURCE_DIR}/src/blake2/blake2b.c
+    ${argon2_SOURCE_DIR}/src/thread.c
+    ${argon2_SOURCE_DIR}/src/encoding.c
+    ${argon2_SOURCE_DIR}/src/ref.c
 )
-FetchContent_MakeAvailable(argon2)
-if(NOT TARGET argon2)
-    add_library(argon2 STATIC
-        ${argon2_SOURCE_DIR}/src/argon2.c
-        ${argon2_SOURCE_DIR}/src/core.c
-        ${argon2_SOURCE_DIR}/src/blake2/blake2b.c
-        ${argon2_SOURCE_DIR}/src/thread.c
-        ${argon2_SOURCE_DIR}/src/encoding.c
-        ${argon2_SOURCE_DIR}/src/ref.c
-    )
-    target_include_directories(argon2 PUBLIC ${argon2_SOURCE_DIR}/include)
-endif()
+target_include_directories(argon2 PUBLIC ${argon2_SOURCE_DIR}/include)
 
-# Fetch OpenSSL for Android (Self-contained repo supporting 3.x)
-FetchContent_Declare(
-    openssl_cmake
-    URL https://github.com/jimmy-park/openssl-cmake/archive/refs/tags/3.6.1.tar.gz
-)
-FetchContent_MakeAvailable(openssl_cmake)
+# OpenSSL (Vendored via openssl-cmake wrapper)
+set(OPENSSL_SOURCE ${EXTERNAL_DIR}/openssl/openssl-src)
+add_subdirectory(${EXTERNAL_DIR}/openssl EXCLUDE_FROM_ALL)
 
-# Fetch SQLCipher amalgamation (using user-suggested ZIP)
-FetchContent_Declare(
-    sqlcipher
-    URL https://github.com/chehrlic/sqlcipher-amalgamation/archive/refs/tags/v4.13.0.tar.gz
-)
-FetchContent_MakeAvailable(sqlcipher)
+# SQLCipher (Vendored Amalgamation)
+set(sqlcipher_SOURCE_DIR ${EXTERNAL_DIR}/sqlcipher)
 
 # Shared sources for our core
 add_library(${CMAKE_PROJECT_NAME} SHARED

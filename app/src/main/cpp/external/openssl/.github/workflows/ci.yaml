@@ -1,0 +1,162 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  cpm-path: .cpm
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [android, ios, linux, macos, windows]
+        version: [1.1.1w, 3.0.19, 3.1.8, 3.2.6, 3.3.6, 3.4.4, 3.5.5, 3.6.1]
+        include:
+          - { os: macos, preset: ios }
+          - { os: macos, preset: macos }
+          - { os: ubuntu, preset: android }
+          - { os: ubuntu, preset: linux }
+          - { os: windows, preset: windows }
+    name: ${{ matrix.preset }}-${{ matrix.version }}
+    runs-on: ${{ matrix.os }}-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          path: ${{ env.cpm-path }}
+          key: openssl-${{ matrix.version }}-cpm
+          enableCrossOsArchive: true
+      - uses: actions/cache@v5
+        with:
+          path: .ccache
+          key: openssl-${{ matrix.version }}-ccache-${{ matrix.preset }}-${{ github.run_id }}
+          restore-keys: openssl-${{ matrix.version }}-ccache-${{ matrix.preset }}-
+
+      - name: Install dependencies on Linux
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build ccache
+      - name: Install dependencies on macOS
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew install ccache
+      - name: Install dependencies on Windows
+        if: runner.os == 'Windows'
+        run: |
+          choco install -y jom nasm ccache
+          echo "PATH=$ENV:PATH;C:\Program Files\NASM" >> $ENV:GITHUB_ENV
+
+      - name: Configure ccache
+        run: |
+          ccache -o cache_dir=${{ github.workspace }}/.ccache
+          ccache -z
+
+      - name: Configure CMake
+        run: >
+          cmake --preset ${{ matrix.preset }}
+          -DCPM_SOURCE_CACHE="${{ env.cpm-path }}"
+          -DOPENSSL_BUILD_VERBOSE=ON
+          -DOPENSSL_CONFIGURE_VERBOSE=ON
+          -DOPENSSL_TARGET_VERSION="${{ matrix.version }}"
+
+      - name: Build
+        run: cmake --build --preset ${{ matrix.preset }}
+
+      - name: Show ccache statistics
+        run: ccache -sv
+
+  build-freebsd:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [1.1.1w, 3.0.19, 3.1.8, 3.2.6, 3.3.6, 3.4.4, 3.5.5, 3.6.1]
+    name: freebsd-${{ matrix.version }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          path: ${{ env.cpm-path }}
+          key: openssl-${{ matrix.version }}-cpm
+          enableCrossOsArchive: true
+      - uses: actions/cache@v5
+        with:
+          path: .ccache
+          key: openssl-${{ matrix.version }}-ccache-freebsd-${{ github.run_id }}
+          restore-keys: openssl-${{ matrix.version }}-ccache-freebsd-
+      - uses: cross-platform-actions/action@master
+        with:
+          operating_system: freebsd
+          architecture: x86_64
+          version: "14.1"
+          run: |
+            sudo pkg install -y ccache4 cmake perl5 ninja
+            ccache -o cache_dir=${{ github.workspace }}/.ccache
+            ccache -z
+            cmake -B build -G Ninja                          \
+              -DCPM_SOURCE_CACHE=${{ env.cpm-path }}         \
+              -DOPENSSL_BUILD_VERBOSE=ON                     \
+              -DOPENSSL_CONFIGURE_VERBOSE=ON                 \
+              -DOPENSSL_TARGET_VERSION=${{ matrix.version }}
+            cmake --build build
+            ccache -sv
+
+  build-mingw64:
+    strategy:
+      fail-fast: false
+      matrix:
+        version: [1.1.1w, 3.0.19, 3.1.8, 3.2.6, 3.3.6, 3.4.4, 3.5.5, 3.6.1]
+    name: mingw64-${{ matrix.version }}
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/cache@v5
+        with:
+          path: .ccache
+          key: openssl-${{ matrix.version }}-ccache-mingw64-${{ github.run_id }}
+          restore-keys: openssl-${{ matrix.version }}-ccache-mingw64-
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          pacboy: >-
+            ccache:p
+            cmake:p
+            gcc:p
+            make:p
+            ninja:p
+
+      - name: Configure ccache
+        run: |
+          ccache -o cache_dir=$(cygpath -u "${{ github.workspace }}/.ccache")
+          ccache -z
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -G Ninja
+          -DOPENSSL_BUILD_VERBOSE=ON
+          -DOPENSSL_CONFIGURE_VERBOSE=ON
+          -DOPENSSL_TARGET_VERSION=${{ matrix.version }}
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Show ccache statistics
+        run: ccache -sv
+
+  create-xcframework:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Create XCFramework
+        run: bash ./script/create-xcframework.sh
