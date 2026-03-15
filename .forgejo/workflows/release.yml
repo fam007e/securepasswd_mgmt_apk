@@ -11,6 +11,7 @@ jobs:
     timeout-minutes: 180
     permissions:
       contents: write
+
     steps:
       - uses: https://github.com/actions/checkout@v4
         with:
@@ -65,19 +66,11 @@ jobs:
           mkdir -p signed-apks
 
           # Find and sign each APK
-          # We search for any .apk files. Gradle produces ...-unsigned.apk when no signing is configured.
           find app/build/outputs/apk/release -name "*.apk" | while read -r apk; do
             filename=$(basename "$apk")
             
-            # Skip already signed or intermediate files if any
             if [[ "$filename" == *"-signed.apk" ]]; then continue; fi
 
-            # Renaming logic to match: securepasswd-v8a.apk, securepasswd-v7a.apk, etc.
-            # 1. Start with filename (e.g., app-arm64-v8a-release-unsigned.apk)
-            # 2. Change 'arm64-v8a' to 'v8a' and 'armeabi-v7a' to 'v7a'
-            # 3. Prepend 'securepasswd-'
-            # 4. Remove '-release-unsigned'
-            
             new_name=$(echo "$filename" | \
               sed 's/app-//' | \
               sed 's/arm64-v8a/v8a/' | \
@@ -97,25 +90,38 @@ jobs:
               --out "signed-apks/$new_name" \
               "$apk"
               
-            # Verify
             $ANDROID_HOME/build-tools/35.0.0/apksigner verify "signed-apks/$new_name"
           done
 
-          # Double check: remove any leftover idsig files if apksigner still created them
           rm -f signed-apks/*.idsig
 
       - name: Cleanup keystore
         if: always()
         run: rm -f keystore.jks
 
-      - name: Create Release
+      # ────────────────────────────────────────────────
+      #   Create the release first (or update if exists)
+      # ────────────────────────────────────────────────
+      - name: Create or update release
+        uses: https://code.forgejo.org/actions/forgejo-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          direction: create
+          tag: ${{ github.ref_name }}
+          title: "SecurePasswd MGMT ${{ github.ref_name }}"
+          token: ${{ secrets.FORGEJO_TOKEN }}
+          release-notes-assistant: true
+          override: true   # updates title/notes if release already exists
+
+      # ────────────────────────────────────────────────
+      #   Then upload assets to the (now guaranteed) release
+      # ────────────────────────────────────────────────
+      - name: Upload release assets
         uses: https://code.forgejo.org/actions/forgejo-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           direction: upload
           release-dir: signed-apks
           tag: ${{ github.ref_name }}
-          title: "SecurePasswd MGMT ${{ github.ref_name }}"
           token: ${{ secrets.FORGEJO_TOKEN }}
-          release-notes-assistant: true
-          override: true
+
