@@ -110,3 +110,12 @@ jobs:
           release-dir: signed-apks
           token: ${{ secrets.FORGEJO_TOKEN }}
           override: true
+
+      - name: Cleanup release
+        if: always()
+        uses: https://code.forgejo.org/actions/forgejo-release@v2
+        with:
+          direction: delete
+          tag: ${{ github.ref_name }}
+          token: ${{ secrets.FORGEJO_TOKEN }}     
+          override: true
