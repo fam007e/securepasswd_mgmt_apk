@@ -1,6 +1,0 @@
-Initial security-hardened release.
-- Handled all secrets in ByteArrays with immediate zeroing.
-- Implemented Argon2id with 128MB memory cost.
-- Added platform security hardening (FLAG_SECURE, sensitive clipboard).
-- Enforced HTTPS for all network operations.
-- Implemented automated Codeberg release workflow.
