@@ -109,5 +109,9 @@ jobs:
             signed-apks/*.apk
           draft: false
           prerelease: false
+          tag_name: ${{ github.ref_name }}
+          name: SecurePasswd MGMT ${{ github.ref_name }}
+          allowUpdates: true
+          make_latest: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
