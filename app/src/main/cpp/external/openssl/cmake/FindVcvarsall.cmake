@@ -58,5 +58,6 @@ function(set_vcvarsall_command COMMAND)
         set(${COMMAND} ${VCVARSALL} ${VCVARSALL_ARCH} ${VCVARSALL_PLATFORM_TYPE} &&)
     endif()
 
-    return(PROPAGATE ${COMMAND})
+    set(${COMMAND} ${${COMMAND}} PARENT_SCOPE)
+    return()
 endfunction()

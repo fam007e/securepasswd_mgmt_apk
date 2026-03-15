@@ -15,7 +15,7 @@ This Android application promises **identical security entropy** to its desktop 
 ## Build Requirements
 - Android Studio Iguana (or newer)
 - Gradle 8.2+
-- Android NDK `25.1.8937393` and CMake `3.25.1`
+- Android NDK `25.1.8937393` and CMake `3.22.1`
 
 ## Building from source
 ```bash

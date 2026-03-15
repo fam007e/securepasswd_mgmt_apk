@@ -65,5 +65,6 @@ function(detect_target_platform TARGET)
         message(WARNING "Failed to detect the target platform for OpenSSL")
     endif()
 
-    return(PROPAGATE ${TARGET})
+    set(${TARGET} ${${TARGET}} PARENT_SCOPE)
+    return()
 endfunction()

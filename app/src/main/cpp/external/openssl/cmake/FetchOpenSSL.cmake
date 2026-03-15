@@ -60,5 +60,8 @@ function(fetch_openssl)
     )
     FetchContent_MakeAvailable(OpenSSL)
 
-    return(PROPAGATE openssl_SOURCE_DIR openssl_BINARY_DIR)
+    set(openssl_SOURCE_DIR ${openssl_SOURCE_DIR} PARENT_SCOPE)
+    set(openssl_BINARY_DIR ${openssl_BINARY_DIR} PARENT_SCOPE)
+
+    return()
 endfunction()

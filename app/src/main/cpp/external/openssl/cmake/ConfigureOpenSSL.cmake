@@ -25,14 +25,16 @@ function(parse_configdata KEY VALUES)
         set(${VALUES} ${OUTPUT})
     endif()
 
-    return(PROPAGATE ${VALUES})
+    set(${VALUES} ${${VALUES}} PARENT_SCOPE)
+    return()
 endfunction()
 
 function(lookup_makefile STRING KEY VALUES)
     string(REGEX MATCH "\n${KEY}=[^\n]*" OUTPUT "${STRING}")
     string(REGEX REPLACE "\n${KEY}=[ ]*" "" ${VALUES} "${OUTPUT}")
 
-    return(PROPAGATE ${VALUES})
+    set(${VALUES} ${${VALUES}} PARENT_SCOPE)
+    return()
 endfunction()
 
 function(parse_makefile FILE KEY VALUES)
@@ -61,7 +63,8 @@ function(parse_makefile FILE KEY VALUES)
     string(REGEX REPLACE "[ ]+" ";" ${VALUES} "${OUTPUT}")
     list(REMOVE_ITEM ${VALUES} "")
 
-    return(PROPAGATE ${VALUES})
+    set(${VALUES} ${${VALUES}} PARENT_SCOPE)
+    return()
 endfunction()
 
 function(apply_ccache FILE)
@@ -161,4 +164,6 @@ function(configure_openssl)
         string(REPLACE "/W3" "/W0" MAKEFILE "${MAKEFILE}")
         file(WRITE ${OPENSSL_MAKEFILE} "${MAKEFILE}")
     endif()
+
+    set(OPENSSL_MAKEFILE ${OPENSSL_MAKEFILE} PARENT_SCOPE)
 endfunction()

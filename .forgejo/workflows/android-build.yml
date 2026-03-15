@@ -27,7 +27,7 @@ jobs:
     - name: Setup Android SDK
       uses: https://github.com/android-actions/setup-android@v3
       with:
-        packages: 'platform-tools platforms;android-36 ndk;25.1.8937393 cmake;3.30.3'
+        packages: 'platform-tools platforms;android-36 ndk;25.1.8937393 cmake;3.22.1'
 
     - name: Debug Environment
       run: |
@@ -58,4 +58,4 @@ jobs:
       uses: https://github.com/actions/upload-artifact@v3
       with:
         name: app-debug
-        path: app/build/outputs/apk/debug/app-debug.apk
+        path: app/build/outputs/apk/debug/*.apk
