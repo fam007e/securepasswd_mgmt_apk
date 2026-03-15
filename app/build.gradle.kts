@@ -17,8 +17,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "com.securepasswd.mgmt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2026031501
+        versionName = "2026.03.15"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

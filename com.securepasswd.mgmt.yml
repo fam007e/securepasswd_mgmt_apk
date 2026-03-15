@@ -1,0 +1,28 @@
+Categories:
+  - Security
+  - Utility
+License: MIT
+AuthorName: Dark Knightz Inc.
+AuthorEmail: faisalmoshiur+securepasswdmgmtapk@gmail.com
+WebSite: https://codeberg.org/fam007e/securepasswd_mgmt_apk
+SourceCode: https://codeberg.org/fam007e/securepasswd_mgmt_apk
+IssueTracker: https://codeberg.org/fam007e/securepasswd_mgmt_apk/issues
+
+RepoType: git
+Repo: https://codeberg.org/fam007e/securepasswd_mgmt_apk
+
+Builds:
+  - versionName: '2026.03.15'
+    versionCode: 2026031501
+    commit: 24a391c91c41810d7d0dd31168b457022e9f07bc
+    subdir: app
+    gradle:
+      - yes
+
+AutoUpdateMode: Version
+UpdateCheckMode: Tags
+CurrentVersion: '2026.03.15'
+CurrentVersionCode: 2026031501
+
+AntiFeatures:
+  - NonFreeNet

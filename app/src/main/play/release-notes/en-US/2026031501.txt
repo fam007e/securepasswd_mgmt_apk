@@ -1,0 +1,6 @@
+Initial release of SecurePasswd MGMT for Android.
+- Argon2id key derivation.
+- Zero-knowledge architecture.
+- Full security entropy parity with desktop versions.
+- Modern Jetpack Compose UI.
+- HIBP k-anonymity checks.
