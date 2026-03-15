@@ -62,15 +62,26 @@ jobs:
           mkdir -p signed-apks
 
           # Find and sign each APK
-          find app/build/outputs/apk/release -name "*.apk" -not -name "*-unsigned.apk" | while read -r apk; do
+          # We search for any .apk files. Gradle produces ...-unsigned.apk when no signing is configured.
+          find app/build/outputs/apk/release -name "*.apk" | while read -r apk; do
             filename=$(basename "$apk")
             
-            # Simple renaming logic to make it look nicer
-            # app-arm64-v8a-release.apk -> securepasswd-arm64-v8a.apk
-            # app-armeabi-v7a-release.apk -> securepasswd-armeabi-v7a.apk
-            # app-universal-release.apk -> securepasswd-universal.apk
+            # Skip already signed or intermediate files if any
+            if [[ "$filename" == *"-signed.apk" ]]; then continue; fi
+
+            # Renaming logic to match: securepasswd-v8a.apk, securepasswd-v7a.apk, etc.
+            # 1. Start with filename (e.g., app-arm64-v8a-release-unsigned.apk)
+            # 2. Change 'arm64-v8a' to 'v8a' and 'armeabi-v7a' to 'v7a'
+            # 3. Prepend 'securepasswd-'
+            # 4. Remove '-release-unsigned'
             
-            new_name=$(echo "$filename" | sed 's/app-//' | sed 's/-release//' | sed 's/^/securepasswd-/')
+            new_name=$(echo "$filename" | \
+              sed 's/app-//' | \
+              sed 's/arm64-v8a/v8a/' | \
+              sed 's/armeabi-v7a/v7a/' | \
+              sed 's/-release-unsigned//' | \
+              sed 's/-unsigned//' | \
+              sed 's/^/securepasswd-/')
             
             echo "Signing $filename as $new_name..."
             
