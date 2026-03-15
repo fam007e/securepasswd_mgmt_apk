@@ -93,12 +93,16 @@ jobs:
               --ks-key-alias "$KEY_ALIAS" \
               --ks-pass env:KEYSTORE_PASSWORD \
               --key-pass env:KEY_PASSWORD \
+              --v4-signing-enabled false \
               --out "signed-apks/$new_name" \
               "$apk"
               
             # Verify
             $ANDROID_HOME/build-tools/35.0.0/apksigner verify "signed-apks/$new_name"
           done
+
+          # Double check: remove any leftover idsig files if apksigner still created them
+          rm -f signed-apks/*.idsig
 
       - name: Cleanup keystore
         if: always()
