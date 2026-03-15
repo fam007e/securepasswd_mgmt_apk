@@ -59,16 +59,13 @@ jobs:
           SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
           JAVA_TOOL_OPTIONS: "--enable-native-access=ALL-UNNAMED"
         run: |
-          # Decode keystore
           echo "$SIGNING_KEY_BASE64" | base64 --decode > keystore.jks
 
-          # Create directory for signed APKs
           mkdir -p signed-apks
 
-          # Find and sign each APK
           find app/build/outputs/apk/release -name "*.apk" | while read -r apk; do
             filename=$(basename "$apk")
-            
+
             if [[ "$filename" == *"-signed.apk" ]]; then continue; fi
 
             new_name=$(echo "$filename" | \
@@ -78,9 +75,9 @@ jobs:
               sed 's/-release-unsigned//' | \
               sed 's/-unsigned//' | \
               sed 's/^/securepasswd-/')
-            
+
             echo "Signing $filename as $new_name..."
-            
+
             $ANDROID_HOME/build-tools/35.0.0/apksigner sign \
               --ks keystore.jks \
               --ks-key-alias "$KEY_ALIAS" \
@@ -89,7 +86,7 @@ jobs:
               --v4-signing-enabled false \
               --out "signed-apks/$new_name" \
               "$apk"
-              
+
             $ANDROID_HOME/build-tools/35.0.0/apksigner verify "signed-apks/$new_name"
           done
 
@@ -99,29 +96,17 @@ jobs:
         if: always()
         run: rm -f keystore.jks
 
-      # ────────────────────────────────────────────────
-      #   Create the release first (or update if exists)
-      # ────────────────────────────────────────────────
-      - name: Create or update release
-        uses: https://code.forgejo.org/actions/forgejo-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
-        with:
-          direction: create
-          tag: ${{ github.ref_name }}
-          title: "SecurePasswd MGMT ${{ github.ref_name }}"
-          token: ${{ secrets.FORGEJO_TOKEN }}
-          release-notes-assistant: true
-          override: true   # updates title/notes if release already exists
-
-      # ────────────────────────────────────────────────
-      #   Then upload assets to the (now guaranteed) release
-      # ────────────────────────────────────────────────
-      - name: Upload release assets
+      - name: Create and upload release
         uses: https://code.forgejo.org/actions/forgejo-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
           direction: upload
-          release-dir: signed-apks
           tag: ${{ github.ref_name }}
+          title: "SecurePasswd MGMT ${{ github.ref_name }}"
+          release-dir: signed-apks
           token: ${{ secrets.FORGEJO_TOKEN }}
-
+          release-notes-assistant: true
+          override: true          # important: allows re-running the workflow without failing if release already exists
+          # Optional extras you might want:
+          # prerelease: true
+          # verbose: true         # for more debug output in logs
