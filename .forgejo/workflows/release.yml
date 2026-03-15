@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*'
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   release:
     runs-on: codeberg-medium
@@ -105,8 +109,4 @@ jobs:
           title: "SecurePasswd MGMT ${{ github.ref_name }}"
           release-dir: signed-apks
           token: ${{ secrets.FORGEJO_TOKEN }}
-          release-notes-assistant: true
-          override: true          # important: allows re-running the workflow without failing if release already exists
-          # Optional extras you might want:
-          # prerelease: true
-          # verbose: true         # for more debug output in logs
+          override: true
