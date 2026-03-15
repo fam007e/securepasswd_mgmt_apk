@@ -74,7 +74,7 @@ extensions.configure<ApplicationExtension>("android") {
     externalNativeBuild {
         cmake {
             path("src/main/cpp/CMakeLists.txt")
-            version = "3.30.3"
+            version = "3.22.1"
         }
     }
 
