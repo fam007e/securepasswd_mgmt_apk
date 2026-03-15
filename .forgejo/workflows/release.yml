@@ -102,16 +102,13 @@ jobs:
         run: rm -f keystore.jks
 
       - name: Create Release
-        uses: https://github.com/softprops/action-gh-release@v2
+        uses: https://github.com/ncipollo/release-action@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: |
-            signed-apks/*.apk
-          draft: false
-          prerelease: false
-          tag_name: ${{ github.ref_name }}
+          artifacts: "signed-apks/*.apk"
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ github.ref_name }}
           name: SecurePasswd MGMT ${{ github.ref_name }}
           allowUpdates: true
-          make_latest: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          replacesArtifacts: true
+          makeLatest: true
