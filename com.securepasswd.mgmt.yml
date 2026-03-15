@@ -7,6 +7,7 @@ WebSite: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 SourceCode: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 IssueTracker: https://codeberg.org/fam007e/securepasswd_mgmt_apk/issues
 
+AutoName: SecurePasswd MGMT
 Summary: Secure Password and TOTP Manager
 Description: |
   A modern, security-focused password and TOTP manager built with Kotlin and C++.
