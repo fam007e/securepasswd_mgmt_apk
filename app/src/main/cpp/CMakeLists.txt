@@ -15,6 +15,7 @@ add_library(argon2 STATIC
     ${argon2_SOURCE_DIR}/src/ref.c
 )
 target_include_directories(argon2 PUBLIC ${argon2_SOURCE_DIR}/include)
+target_compile_options(argon2 PRIVATE -Wno-macro-redefined)
 
 # OpenSSL (Vendored via openssl-cmake wrapper)
 set(OPENSSL_SOURCE ${EXTERNAL_DIR}/openssl/openssl-src)
@@ -52,6 +53,8 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${argon2_SOURCE_DIR}/include
 )
+
+target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE -Wno-macro-redefined)
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
     android

@@ -17,6 +17,8 @@ Builds:
     subdir: app
     gradle:
       - yes
+    gradleprops:
+      - fdroid
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags

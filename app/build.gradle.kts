@@ -25,6 +25,11 @@ extensions.configure<ApplicationExtension>("android") {
             useSupportLibrary = true
         }
 
+        ndk {
+            // Ensure we only build for these ABIs even when splits are disabled
+            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a"))
+        }
+
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
@@ -39,9 +44,11 @@ extensions.configure<ApplicationExtension>("android") {
         }
     }
 
+    val isFdroidBuild = project.hasProperty("fdroid")
+
     splits {
         abi {
-            isEnable = true
+            isEnable = !isFdroidBuild
             reset()
             include("armeabi-v7a", "arm64-v8a")
             isUniversalApk = true
@@ -92,9 +99,11 @@ extensions.configure<ApplicationExtension>("android") {
             val abiMultiplier = when (abi) {
                 "armeabi-v7a" -> 1
                 "arm64-v8a" -> 2
-                else -> 0 // Universal
+                else -> 0 // Universal / Fat
             }
-            outputImpl.versionCodeOverride = (defaultConfig.versionCode ?: 0) * 10 + abiMultiplier
+            // Use addition instead of multiplication by 10 to avoid Int overflow
+            // with large date-based versionCode (e.g., 2026031610)
+            outputImpl.versionCodeOverride = (defaultConfig.versionCode ?: 0) + abiMultiplier
         }
     }
 }
