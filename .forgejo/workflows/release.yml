@@ -21,10 +21,10 @@ jobs:
         with:
           submodules: recursive
 
-      - name: set up JDK 25
+      - name: set up JDK 21
         uses: https://github.com/actions/setup-java@v4
         with:
-          java-version: '25'
+          java-version: '21'
           distribution: 'temurin'
           cache: gradle
 
