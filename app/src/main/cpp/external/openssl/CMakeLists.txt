@@ -118,6 +118,22 @@ if(MSVC)
 elseif(MINGW)
     find_program(MAKE mingw32-make REQUIRED)
     set(OPENSSL_BUILD_TOOL ${MAKE})
+elseif(ANDROID)
+    # The Android NDK ships its own make — use it instead of relying on host make
+    find_program(MAKE make
+        PATHS
+            "${CMAKE_ANDROID_NDK}/prebuilt/linux-x86_64/bin"
+            "${ANDROID_NDK}/prebuilt/linux-x86_64/bin"
+        NO_DEFAULT_PATH
+    )
+    if(NOT MAKE)
+        # Fall back to host make if NDK make not found
+        find_program(MAKE make)
+    endif()
+    if(NOT MAKE)
+        message(FATAL_ERROR "Could not find make. Checked NDK at ${CMAKE_ANDROID_NDK}/prebuilt/linux-x86_64/bin and host PATH.")
+    endif()
+    set(OPENSSL_BUILD_TOOL ${MAKE})
 else()
     find_program(MAKE make REQUIRED)
     set(OPENSSL_BUILD_TOOL ${MAKE})
