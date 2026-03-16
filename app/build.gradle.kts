@@ -33,6 +33,8 @@ extensions.configure<ApplicationExtension>("android") {
         externalNativeBuild {
             cmake {
                 cppFlags += "-std=c++17"
+                cppFlags += "-Wno-macro-redefined"
+                cFlags += "-Wno-macro-redefined"
                 
                 // Allow targeting specific ABIs via command line for faster CI/Dev builds
                 val requestedAbi = project.findProperty("android.injected.abi.requested") as? String
@@ -95,7 +97,7 @@ extensions.configure<ApplicationExtension>("android") {
     (this as com.android.build.gradle.AppExtension).applicationVariants.all {
         outputs.forEach { output ->
             val outputImpl = output as com.android.build.gradle.internal.api.ApkVariantOutputImpl
-            val abi = outputImpl.getFilter(com.android.build.OutputFile.ABI)
+            val abi = outputImpl.getFilter("ABI")
             val abiMultiplier = when (abi) {
                 "armeabi-v7a" -> 1
                 "arm64-v8a" -> 2
