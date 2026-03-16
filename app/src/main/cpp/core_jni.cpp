@@ -119,8 +119,7 @@ Java_com_securepasswd_mgmt_CoreInterop_generateTotp(
 
     sodium_memzero(sec_cstr, sec_len);
     free(sec_cstr);
-    sodium_memzero(sec_bytes, sec_len);
-    env->ReleaseByteArrayElements(secret, sec_bytes, 0);
+    env->ReleaseByteArrayElements(secret, sec_bytes, JNI_ABORT);
 
     if (code) {
         size_t code_len = strlen(code);

@@ -57,11 +57,11 @@ class CoreInteropAndroidTest {
     @Test
     fun testTotpGeneration() {
         // Google Authenticator Test Vector Secret: "JBSWY3DPEHPK3PXP" (Hello!)
-        // Since TOTP is time-based, we can't assert a static 6-digit code easily
-        // without mocking time. We just assert it returns a 6-digit string structure.
-        val totp = CoreInterop.generateTotp("JBSWY3DPEHPK3PXP")
-        assertNotNull(totp)
-        if (totp.isNotEmpty()) {
+        val secret = "JBSWY3DPEHPK3PXP".toByteArray(Charsets.UTF_8)
+        val totpBytes = CoreInterop.generateTotp(secret)
+        assertNotNull(totpBytes)
+        if (totpBytes.isNotEmpty()) {
+            val totp = String(totpBytes, Charsets.UTF_8)
             assertEquals(6, totp.length)
             assertTrue(totp.all { it.isDigit() })
         }
