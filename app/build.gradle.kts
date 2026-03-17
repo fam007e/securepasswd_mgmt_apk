@@ -46,11 +46,11 @@ extensions.configure<ApplicationExtension>("android") {
         }
     }
 
-    val isFdroidBuild = project.hasProperty("fdroid")
+    val isSplitEnabled = project.hasProperty("enableSplits")
 
     splits {
         abi {
-            isEnable = !isFdroidBuild
+            isEnable = isSplitEnabled
             reset()
             include("armeabi-v7a", "arm64-v8a")
             isUniversalApk = true
