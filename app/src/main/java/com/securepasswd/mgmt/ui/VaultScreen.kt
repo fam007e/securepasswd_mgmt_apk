@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,7 +33,9 @@ fun VaultScreen(
     entries: List<PasswordEntry>,
     onAddEntry: () -> Unit,
     onEntryClick: (PasswordEntry) -> Unit,
-    onExport: () -> Unit,
+    onExportEncrypted: () -> Unit,
+    onExportCsv: () -> Unit,
+    onImportCsv: () -> Unit,
     onSync: () -> Unit,
     onEntryDelete: (PasswordEntry) -> Unit,
     onBulkHealthCheck: (List<PasswordEntry>) -> Unit = {},
@@ -197,7 +202,9 @@ fun VaultScreen(
                             placeholder = { Text("Search accounts...") },
                             modifier = Modifier.fillMaxWidth(),
                             colors = TextFieldDefaults.colors(
-                                containerColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
                                 focusedIndicatorColor = Color.Transparent,
                                 unfocusedIndicatorColor = Color.Transparent
                             ),
@@ -228,9 +235,11 @@ fun VaultScreen(
                         Text("Your Vault", fontWeight = FontWeight.Bold)
                     },
                     actions = {
+                        var showMenu by remember { mutableStateOf(false) }
+
                         IconButton(onClick = { isSearchActive = true }) {
                             Icon(
-                                painter = painterResource(id = android.R.drawable.ic_menu_search),
+                                imageVector = androidx.compose.material.icons.Icons.Default.Search,
                                 contentDescription = "Search",
                                 tint = colors.onBackground
                             )
@@ -245,20 +254,56 @@ fun VaultScreen(
                                 modifier = Modifier.size(24.dp)
                             )
                         }
-                        IconButton(onClick = onExport) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_export_custom),
-                                contentDescription = "Export Vault",
-                                tint = colors.onBackground
-                            )
-                        }
-                        IconButton(onClick = onSync) {
-                            Icon(
-                                painter = painterResource(id = R.drawable.ic_sync_custom),
-                                contentDescription = "Sync from Desktop",
-                                tint = colors.onBackground,
-                                modifier = Modifier.size(24.dp)
-                            )
+                        
+                        Box {
+                            IconButton(onClick = { showMenu = true }) {
+                                Icon(
+                                    imageVector = androidx.compose.material.icons.Icons.Default.MoreVert,
+                                    contentDescription = "More Options",
+                                    tint = colors.onBackground
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = showMenu,
+                                onDismissRequest = { showMenu = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text("Sync from Desktop") },
+                                    onClick = {
+                                        showMenu = false
+                                        onSync()
+                                    },
+                                    leadingIcon = {
+                                        Icon(
+                                            painter = painterResource(id = R.drawable.ic_sync_custom),
+                                            contentDescription = null,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                )
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Import CSV") },
+                                    onClick = {
+                                        showMenu = false
+                                        onImportCsv()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Export CSV (Plaintext)") },
+                                    onClick = {
+                                        showMenu = false
+                                        onExportCsv()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Backup Vault (Encrypted)") },
+                                    onClick = {
+                                        showMenu = false
+                                        onExportEncrypted()
+                                    }
+                                )
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
