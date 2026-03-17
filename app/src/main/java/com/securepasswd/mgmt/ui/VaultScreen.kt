@@ -41,6 +41,21 @@ fun VaultScreen(
     val refreshTrigger by totpViewModel.refreshTrigger.collectAsState()
     val colors = MaterialTheme.colorScheme
 
+    // ── Search & Filter state ────────────────────────────────────────────────
+    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by remember { mutableStateOf(false) }
+
+    val filteredAndSortedEntries = remember(entries, searchQuery) {
+        entries.filter {
+            it.service.contains(searchQuery, ignoreCase = true) ||
+            it.username.contains(searchQuery, ignoreCase = true)
+        }.sortedWith(compareBy({ it.service.lowercase() }, { it.username.lowercase() }))
+    }
+
+    val groupedEntries = remember(filteredAndSortedEntries) {
+        filteredAndSortedEntries.groupBy { it.service.take(1).uppercase() }
+    }
+
     // ── Multi-select state ──────────────────────────────────────────────────
     var isMultiSelectMode by remember { mutableStateOf(false) }
     var selectedIds by remember { mutableStateOf(emptySet<Int>()) }
@@ -49,10 +64,15 @@ fun VaultScreen(
     var entryPendingDelete by remember { mutableStateOf<PasswordEntry?>(null) }
     var showBulkDeleteDialog by remember { mutableStateOf(false) }
 
-    // Exit multi-select on back press
-    BackHandler(enabled = isMultiSelectMode) {
-        isMultiSelectMode = false
-        selectedIds = emptySet()
+    // Exit multi-select or search on back press
+    BackHandler(enabled = isMultiSelectMode || isSearchActive) {
+        if (isMultiSelectMode) {
+            isMultiSelectMode = false
+            selectedIds = emptySet()
+        } else {
+            isSearchActive = false
+            searchQuery = ""
+        }
     }
 
     // ── Single-delete confirmation dialog ───────────────────────────────────
@@ -168,12 +188,53 @@ fun VaultScreen(
                         titleContentColor = colors.onSurface
                     )
                 )
+            } else if (isSearchActive) {
+                TopAppBar(
+                    title = {
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            placeholder = { Text("Search accounts...") },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = TextFieldDefaults.colors(
+                                containerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent
+                            ),
+                            singleLine = true
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = {
+                            isSearchActive = false
+                            searchQuery = ""
+                        }) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_arrow_back_custom),
+                                contentDescription = "Back",
+                                tint = colors.onBackground,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = colors.background,
+                        titleContentColor = colors.onBackground
+                    )
+                )
             } else {
                 TopAppBar(
                     title = {
                         Text("Your Vault", fontWeight = FontWeight.Bold)
                     },
                     actions = {
+                        IconButton(onClick = { isSearchActive = true }) {
+                            Icon(
+                                painter = painterResource(id = android.R.drawable.ic_menu_search),
+                                contentDescription = "Search",
+                                tint = colors.onBackground
+                            )
+                        }
                         IconButton(onClick = onToggleTheme) {
                             Icon(
                                 painter = painterResource(
@@ -232,94 +293,112 @@ fun VaultScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
-            items(entries, key = { it.id }) { entry ->
-                val isSelected = entry.id in selectedIds
+            groupedEntries.forEach { (initial, items) ->
+                stickyHeader {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(colors.background)
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = initial,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = colors.primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
 
-                if (isMultiSelectMode) {
-                    val totpCode = remember(entry.totpSecret, refreshTrigger) {
-                        if (entry.totpSecret.isNotEmpty()) totpViewModel.getTotp(entry.totpSecret) else ""
-                    }
-                    val healthStatus = remember(entry.password, entries.size, entry.pwnedCount) {
-                        HealthCheckLogic.analyzePassword(entry.password, entries, entry.pwnedCount)
-                    }
-                    VaultItem(
-                        entry = entry,
-                        totpCode = totpCode,
-                        healthLabel = healthStatus.label,
-                        healthColor = when (healthStatus.label) {
-                            "Compromised" -> Color.Red
-                            "Strong" -> Color(0xFF4CAF50)
-                            "Moderate" -> Color(0xFFFFC107)
-                            else -> Color(0xFFF44336)
-                        },
-                        isSelected = isSelected,
-                        onClick = {
-                            selectedIds = if (isSelected) selectedIds - entry.id else selectedIds + entry.id
-                        },
-                        onLongPress = {
-                            selectedIds = if (isSelected) selectedIds - entry.id else selectedIds + entry.id
+                items(items, key = { it.id }) { entry ->
+                    val isSelected = entry.id in selectedIds
+
+                    if (isMultiSelectMode) {
+                        val totpCode = remember(entry.totpSecret, refreshTrigger) {
+                            if (entry.totpSecret.isNotEmpty()) totpViewModel.getTotp(entry.totpSecret) else ""
                         }
-                    )
-                } else {
-                    val dismissState = rememberSwipeToDismissBoxState()
-
-                    LaunchedEffect(dismissState.targetValue) {
-                        if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) {
-                            entryPendingDelete = entry
-                            dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                        val healthStatus = remember(entry.password, entries.size, entry.pwnedCount) {
+                            HealthCheckLogic.analyzePassword(entry.password, entries, entry.pwnedCount)
                         }
-                    }
+                        VaultItem(
+                            entry = entry,
+                            totpCode = totpCode,
+                            healthLabel = healthStatus.label,
+                            healthColor = when (healthStatus.label) {
+                                "Compromised" -> Color.Red
+                                "Strong" -> Color(0xFF4CAF50)
+                                "Moderate" -> Color(0xFFFFC107)
+                                else -> Color(0xFFF44336)
+                            },
+                            isSelected = isSelected,
+                            onClick = {
+                                selectedIds = if (isSelected) selectedIds - entry.id else selectedIds + entry.id
+                            },
+                            onLongPress = {
+                                selectedIds = if (isSelected) selectedIds - entry.id else selectedIds + entry.id
+                            }
+                        )
+                    } else {
+                        val dismissState = rememberSwipeToDismissBoxState()
 
-                    SwipeToDismissBox(
-                        state = dismissState,
-                        enableDismissFromStartToEnd = false,
-                        backgroundContent = {
-                            val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
-                                Color.Red
-                            } else Color.Transparent
+                        LaunchedEffect(dismissState.targetValue) {
+                            if (dismissState.targetValue == SwipeToDismissBoxValue.EndToStart) {
+                                entryPendingDelete = entry
+                                dismissState.snapTo(SwipeToDismissBoxValue.Settled)
+                            }
+                        }
 
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(color, RoundedCornerShape(12.dp))
-                                    .padding(horizontal = 20.dp),
-                                contentAlignment = Alignment.CenterEnd
-                            ) {
-                                Icon(
-                                    painter = painterResource(id = R.drawable.ic_delete_custom),
-                                    contentDescription = "Delete",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
+                        SwipeToDismissBox(
+                            state = dismissState,
+                            enableDismissFromStartToEnd = false,
+                            backgroundContent = {
+                                val color = if (dismissState.dismissDirection == SwipeToDismissBoxValue.EndToStart) {
+                                    Color.Red
+                                } else Color.Transparent
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(color, RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 20.dp),
+                                    contentAlignment = Alignment.CenterEnd
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_delete_custom),
+                                        contentDescription = "Delete",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            },
+                            content = {
+                                val totpCode = remember(entry.totpSecret, refreshTrigger) {
+                                    if (entry.totpSecret.isNotEmpty()) totpViewModel.getTotp(entry.totpSecret) else ""
+                                }
+                                val healthStatus = remember(entry.password, entries.size, entry.pwnedCount) {
+                                    HealthCheckLogic.analyzePassword(entry.password, entries, entry.pwnedCount)
+                                }
+
+                                VaultItem(
+                                    entry = entry,
+                                    totpCode = totpCode,
+                                    healthLabel = healthStatus.label,
+                                    healthColor = when (healthStatus.label) {
+                                        "Compromised" -> Color.Red
+                                        "Strong" -> Color(0xFF4CAF50)
+                                        "Moderate" -> Color(0xFFFFC107)
+                                        else -> Color(0xFFF44336)
+                                    },
+                                    isSelected = false,
+                                    onClick = { onEntryClick(entry) },
+                                    onLongPress = {
+                                        isMultiSelectMode = true
+                                        selectedIds = setOf(entry.id)
+                                    }
                                 )
                             }
-                        },
-                        content = {
-                            val totpCode = remember(entry.totpSecret, refreshTrigger) {
-                                if (entry.totpSecret.isNotEmpty()) totpViewModel.getTotp(entry.totpSecret) else ""
-                            }
-                            val healthStatus = remember(entry.password, entries.size, entry.pwnedCount) {
-                                HealthCheckLogic.analyzePassword(entry.password, entries, entry.pwnedCount)
-                            }
-
-                            VaultItem(
-                                entry = entry,
-                                totpCode = totpCode,
-                                healthLabel = healthStatus.label,
-                                healthColor = when (healthStatus.label) {
-                                    "Compromised" -> Color.Red
-                                    "Strong" -> Color(0xFF4CAF50)
-                                    "Moderate" -> Color(0xFFFFC107)
-                                    else -> Color(0xFFF44336)
-                                },
-                                isSelected = false,
-                                onClick = { onEntryClick(entry) },
-                                onLongPress = {
-                                    isMultiSelectMode = true
-                                    selectedIds = setOf(entry.id)
-                                }
-                            )
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
