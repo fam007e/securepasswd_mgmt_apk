@@ -7,6 +7,9 @@ SecurePasswd MGMT is a highly secure, open-source Password and TOTP manager for 
 - <b>Privacy First:</b> Sensitive data is handled in ByteArrays and explicitly zeroed in memory after use. No immutable strings are used for secrets.
 - <b>Zero-Knowledge:</b> No telemetry, no tracking, and no unexpected network calls. Your data stays in your control.
 - <b>Password Health:</b> Privacy-preserving k-anonymity checks via Have I Been Pwned (HIBP) API.
+- <b>Fast Navigation:</b> Real-time search, global alphabetical sorting, and sticky headers for quick access to your accounts.
+- <b>Conflict-Aware Merging:</b> Intelligent data merging engine with Git-style "Merge Review" to prevent accidental data loss during imports or syncs.
+- <b>Secure CSV Support:</b> Import and export plaintext CSV files with built-in protection against formula injection attacks.
 - <b>Local Sync:</b> Secure, authenticated vault synchronization for cross-device usage.
 - <b>Modern Interface:</b> A sleek and intuitive experience built with <b>Jetpack Compose</b> and Material 3.
 

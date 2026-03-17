@@ -29,6 +29,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import android.view.WindowManager
 import org.woheller69.freeDroidWarn.FreeDroidWarn
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,7 +65,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     AppNavigation(
-                        onExport = {
+                        onExportEncrypted = {
                             VaultSyncManager.exportVault(this)?.let { uri ->
                                 val shareIntent = Intent(Intent.ACTION_SEND).apply {
                                     type = "application/octet-stream"
@@ -87,7 +90,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AppNavigation(
-    onExport: () -> Unit,
+    onExportEncrypted: () -> Unit,
     isDarkTheme: Boolean,
     onToggleTheme: () -> Unit
 ) {
@@ -97,6 +100,56 @@ fun AppNavigation(
     var loginError by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
     val lifecycleScope = (context as MainActivity).lifecycleScope
+
+    // CSV Export Launcher
+    val csvExportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let {
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    context.contentResolver.openOutputStream(it)?.use { os ->
+                        CsvManager.exportToCsv(os, entries)
+                    }
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "CSV exported successfully", Toast.LENGTH_SHORT).show()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Export failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
+
+    // CSV Import Launcher
+    val csvImportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let {
+            lifecycleScope.launch(Dispatchers.IO) {
+                try {
+                    val content = context.contentResolver.openInputStream(it)?.bufferedReader()?.use { it.readText() }
+                    if (content != null) {
+                        val importedEntries = CsvManager.parseCsv(content)
+                        val report = MergeManager.analyzeMerge(entries, importedEntries)
+                        withContext(Dispatchers.Main) {
+                            if (report.additions.isEmpty() && report.conflicts.isEmpty()) {
+                                Toast.makeText(context, "No new entries found in CSV", Toast.LENGTH_SHORT).show()
+                            } else {
+                                currentScreen = Screen.MergeReview(report)
+                            }
+                        }
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "Import failed: ${e.message}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+        }
+    }
 
     // ── Hardware/gesture back-button routing ──────────────────────────────
     // Login: no BackHandler → system default (exits app) ✓
@@ -159,7 +212,9 @@ fun AppNavigation(
                         }
                     }
                 },
-                onExport = onExport,
+                onExportEncrypted = onExportEncrypted,
+                onExportCsv = { csvExportLauncher.launch("vault_export.csv") },
+                onImportCsv = { csvImportLauncher.launch(arrayOf("text/comma-separated-values", "text/csv")) },
                 onSync = { currentScreen = Screen.Sync },
                 onEntryDelete = { entry ->
                     lifecycleScope.launch(Dispatchers.IO) {
@@ -268,6 +323,39 @@ fun AppNavigation(
                 }
             )
         }
+        is Screen.MergeReview -> {
+            com.securepasswd.mgmt.ui.MergeReviewScreen(
+                report = screen.report,
+                onCancel = { currentScreen = Screen.Vault },
+                onAccept = { acceptedEntries ->
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        acceptedEntries.forEach { entry ->
+                            // If ID is 0, it's a new entry (Addition)
+                            // If ID > 0, it's an existing entry being updated (Conflict resolution: Use Incoming)
+                            if (entry.id == 0) {
+                                CoreInterop.databaseAddEntry(
+                                    entry.service, entry.username, 
+                                    entry.password, entry.totpSecret, 
+                                    entry.recoveryCodes, entry.pwnedCount
+                                )
+                            } else {
+                                CoreInterop.databaseUpdateEntry(
+                                    entry.id, entry.service, entry.username,
+                                    entry.password, entry.totpSecret,
+                                    entry.recoveryCodes, entry.pwnedCount
+                                )
+                            }
+                        }
+                        val updated = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
+                        withContext(Dispatchers.Main) {
+                            entries = updated
+                            currentScreen = Screen.Vault
+                            Toast.makeText(context, "Successfully merged ${acceptedEntries.size} entries", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            )
+        }
     }
 }
 
@@ -276,6 +364,7 @@ sealed class Screen {
     object Vault : Screen()
     object AddEntry : Screen()
     object Sync : Screen()
+    data class MergeReview(val report: MergeReport) : Screen()
     data class Details(val entry: PasswordEntry) : Screen()
     data class EditEntry(val entry: PasswordEntry) : Screen()
 }
