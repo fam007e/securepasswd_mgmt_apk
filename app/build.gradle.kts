@@ -17,8 +17,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "com.securepasswd.mgmt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2026031610 // Base version code for ABI splitting logic
-        versionName = "2026.03.16"
+        versionCode = 2026031810 // Base version code for ABI splitting logic
+        versionName = "2026.03.18"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -104,7 +104,7 @@ extensions.configure<ApplicationExtension>("android") {
                 else -> 0 // Universal / Fat
             }
             // Use addition instead of multiplication by 10 to avoid Int overflow
-            // with large date-based versionCode (e.g., 2026031610)
+            // with large date-based versionCode (e.g., 2026031810)
             outputImpl.versionCodeOverride = (defaultConfig.versionCode ?: 0) + abiMultiplier
         }
     }

@@ -1,0 +1,5 @@
+- Vault Screen enhancements: Added alphabetical sorting and search functionality.
+- Sticky headers for easier navigation in the vault.
+- Improved documentation: Expanded security, architecture, and feature guides.
+- Conflict-aware CSV import/export.
+- New merge review UI for vault synchronization.
