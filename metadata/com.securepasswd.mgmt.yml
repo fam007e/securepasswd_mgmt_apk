@@ -13,7 +13,7 @@ Repo: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 Builds:
   - versionName: 2026.03.16
     versionCode: 2026031610
-    commit: v2026.03.16
+    commit: 9c23163ec11ed86282a50bf3bc64e8307fa65c39
     subdir: app
     gradle:
       - yes
