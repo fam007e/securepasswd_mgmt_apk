@@ -19,6 +19,9 @@ This Android application promises **identical security entropy** to its desktop 
 * **Salt Handling:** Unique salt generation relies exclusively on underlying `/dev/urandom` Linux kernel polling via a `libsodium` shim layer.
 * **Memory Safety:** Sensitive data (passwords, TOTP seeds) is handled in `ByteArray` and explicitly zeroed immediately after use. Master passwords never exist as immutable strings in the JVM heap.
 * **Zero-Knowledge Architecture:** No telemetry or tracking.
+* **Advanced Navigation:** Real-time search, global alphabetical sorting, and sticky headers for efficient vault management.
+* **Conflict-Aware Merging:** A Git-style "Merge Review" engine that detects and resolves duplicates/conflicts during imports or syncs, preventing data loss.
+* **Secure CSV Support:** Plaintext import and export with built-in protection against Formula Injection (CSV injection).
 * **Password Health Checks:** Uses a privacy-preserving k-anonymity request to the [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords) API. Only the first 5 characters of a SHA-1 hash are sent. (Note: This is a monetary-free but proprietary network service, which F-Droid tags as `NonFreeNet`).
 * **Modern Material UI:** Featuring intuitive desktop-like themes utilizing the Jetpack Compose framework.
 
