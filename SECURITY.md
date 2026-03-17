@@ -4,7 +4,7 @@
 Currently, only the `main` branch is actively supported with security updates.
 
 ## Cryptographic Entropy & Parity
-**SecurePasswd_MGMT_APK guarantees 1:1 cryptographic parity with its desktop counterpart.**
+**SecurePasswd MGMT guarantees 1:1 cryptographic parity with its desktop counterpart.**
 The Android port achieves this by natively compiling the C `core` library using the Android NDK.
 
 Critical Security Implementations:

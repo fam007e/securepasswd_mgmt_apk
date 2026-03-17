@@ -1,6 +1,16 @@
-# SecurePasswd_MGMT_APK
+<p align="center">
+  <img src="app/src/main/res/drawable/ic_app_icon_custom.png" width="128" height="128">
+</p>
 
-A natively port of the `SecurePasswd_MGMT` desktop application to Android using Jetpack Compose, Kotlin, and the C++ Android NDK.
+<h1 align="center">SecurePasswd MGMT</h1>
+
+<p align="center">
+  <a href="https://codeberg.org/fam007e/securepasswd_mgmt_apk/actions/workflows/android-build.yml"><img src="https://codeberg.org/fam007e/securepasswd_mgmt_apk/actions/workflows/android-build.yml/badge.svg" alt="Build Status"></a>
+  <a href="https://codeberg.org/fam007e/securepasswd_mgmt_apk/actions/workflows/release.yml"><img src="https://codeberg.org/fam007e/securepasswd_mgmt_apk/actions/workflows/release.yml/badge.svg" alt="Release Status"></a>
+  <a href="https://f-droid.org/packages/com.securepasswd.mgmt/"><img src="https://img.shields.io/f-droid/v/com.securepasswd.mgmt?logo=f-droid&logoColor=white" alt="F-Droid"></a>
+</p>
+
+A native port of the `SecurePasswd_MGMT` desktop application to Android using Jetpack Compose, Kotlin, and the C++ Android NDK.
 
 ## Features & Security Entropy
 This Android application promises **identical security entropy** to its desktop CLI/GUI counterparts. By dynamically compiling the exact C `core` library via JNI, we bypass high-level platform RNG implementation differences:

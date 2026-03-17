@@ -1,4 +1,4 @@
-# Contributing to SecurePasswd_MGMT_APK
+# Contributing to SecurePasswd MGMT
 
 Thank you for your interest! We welcome pull requests.
 
