@@ -38,6 +38,7 @@ compile_commands.json
 .clangd/
 
 # ---> System/Build
+.desktop_repo/
 *.log
 *.tmp
 *.bak
