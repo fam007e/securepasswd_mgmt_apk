@@ -59,3 +59,12 @@ int save_salt(const char *path, const uint8_t *salt) {
     }
     return 0;
 }
+
+int generate_new_salt_and_key(const char *password, const char *salt_path, uint8_t *key) {
+    uint8_t salt[SALT_LEN];
+    if (sodium_init() < 0) return -1;
+    randombytes_buf(salt, SALT_LEN);
+    
+    if (save_salt(salt_path, salt) != 0) return -1;
+    return derive_key(password, salt, key);
+}
