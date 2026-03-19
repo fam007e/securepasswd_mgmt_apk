@@ -4,7 +4,9 @@ project("securepasswd_mgmt_apk")
 # Suppress noisy macro redefinition warnings globally (e.g., __PIC__)
 add_compile_options(-Wno-macro-redefined)
 
-set(CORE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/core)
+# CMAKE_CURRENT_SOURCE_DIR is app/src/main/cpp
+set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../)
+set(CORE_DIR ${PROJECT_ROOT}/core)
 set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external)
 
 # Argon2 (Vendored)
@@ -29,15 +31,17 @@ set(sqlcipher_SOURCE_DIR ${EXTERNAL_DIR}/sqlcipher)
 # Shared sources for our core
 add_library(${CMAKE_PROJECT_NAME} SHARED
     core_jni.cpp
-    libsodium_shim.c
-    sha1.c
-    hmac.c
     ${sqlcipher_SOURCE_DIR}/sqlite3.c
+    ${CORE_DIR}/libsodium_shim.c
+    ${CORE_DIR}/sha1.c
+    ${CORE_DIR}/hmac.c
     ${CORE_DIR}/database.c
     ${CORE_DIR}/key_derivation.c
     ${CORE_DIR}/password_generator.c
     ${CORE_DIR}/totp.c
     ${CORE_DIR}/sync_service.c
+    ${CORE_DIR}/pwned_check.c
+    ${CORE_DIR}/platform_paths.c
 )
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
@@ -47,6 +51,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     SQLITE_ENABLE_RTREE
     SQLITE_EXTRA_INIT=sqlcipher_extra_init
     SQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown
+    __ANDROID__
 )
 
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE

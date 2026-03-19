@@ -3,10 +3,10 @@
 #include <android/log.h>
 #include <sodium.h>
 extern "C" {
-#include "core/database.h"
-#include "core/password_generator.h"
-#include "core/totp.h"
-#include "core/sync_service.h"
+#include "database.h"
+#include "password_generator.h"
+#include "totp.h"
+#include "sync_service.h"
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -31,7 +31,10 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseOpen(
     memcpy(pass_cstr, pass_bytes, pass_len);
     pass_cstr[pass_len] = '\0';
 
-    int result = database_open(path, pass_cstr);
+    char salt_path[2048];
+    snprintf(salt_path, sizeof(salt_path), "%s.salt", path);
+
+    int result = database_open(path, pass_cstr, salt_path);
     if (result != 0) {
         __android_log_print(ANDROID_LOG_ERROR, "CoreInterop", "Failed to open database: %d", result);
     }
@@ -56,7 +59,7 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseGetAllEntries(
         JNIEnv* env,
         jobject /* this */) {
     int count = 0;
-    PasswordEntry* entries = database_get_all_entries(&count);
+    PasswordEntry* entries = database_get_all(&count);
 
     jclass entryClass = env->FindClass("com/securepasswd/mgmt/PasswordEntry");
     if (!entryClass) return NULL;
@@ -168,13 +171,13 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseAddEntry(
 
     entry.pwned_count = pwnedCount;
 
-    int result = database_add_entry(&entry);
+    int result = database_add(&entry);
     if (result <= 0) {
         __android_log_print(ANDROID_LOG_ERROR, "CoreInterop", "Failed to add entry: %d", result);
     }
 
-    // entry fields are copied/used by database_add_entry, but we should zero them if they are local copies
-    // database_add_entry in this app's core usually strdups if it needs to keep data, 
+    // entry fields are copied/used by database_add, but we should zero them if they are local copies
+    // database_add in this app's core usually strdups if it needs to keep data, 
     // but here we allocated them ourselves to pass to the core.
     
     env->ReleaseStringUTFChars(service, entry.service);
@@ -232,7 +235,7 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseUpdateEntry(
 
     entry.pwned_count = pwnedCount;
 
-    int result = database_update_entry(&entry);
+    int result = database_update(&entry);
     if (result != 0) {
         __android_log_print(ANDROID_LOG_ERROR, "CoreInterop", "Failed to update entry: %d", result);
     }
@@ -261,7 +264,7 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseGetEntry(
         jobject /* this */,
         jint id) {
 
-    PasswordEntry* entry = database_get_entry_secure(id);
+    PasswordEntry* entry = database_get_by_id(id);
     if (!entry) return NULL;
 
     jclass entryClass = env->FindClass("com/securepasswd/mgmt/PasswordEntry");
@@ -313,7 +316,7 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseDeleteEntry(
         JNIEnv* env,
         jobject /* this */,
         jint id) {
-    return database_delete_entry(id);
+    return database_delete(id);
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL

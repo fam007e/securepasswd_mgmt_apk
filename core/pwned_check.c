@@ -1,7 +1,9 @@
 #include "pwned_check.h"
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#ifndef __ANDROID__
 #include <curl/curl.h>
+#endif
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -10,6 +12,7 @@
 #define strtok_r strtok_s
 #endif
 
+#ifndef __ANDROID__
 // Memory struct for libcurl write callback
 struct MemoryStruct {
     char *memory;
@@ -40,6 +43,7 @@ static size_t write_callback(const void *contents, size_t size, size_t nmemb, vo
     mem->memory[mem->size] = 0;
     return realsize;
 }
+#endif
 
 int is_password_pwned(const char *password) {
     if (!password) return -1;
@@ -90,6 +94,10 @@ int is_password_pwned(const char *password) {
     }
     const char *suffix = full_hash + 5;
 
+#ifdef __ANDROID__
+    // On Android, networking is handled in Kotlin.
+    return -1;
+#else
     // 3. Query the HIBP API
     char url[256]; // flawfinder: ignore
     snprintf(url, sizeof(url), "https://api.pwnedpasswords.com/range/%s", prefix); // flawfinder: ignore
@@ -137,4 +145,5 @@ int is_password_pwned(const char *password) {
 
     free(chunk.memory);
     return pwn_count;
+#endif
 }
