@@ -10,7 +10,8 @@ Thank you for your interest! We welcome pull requests.
 5. Submit a Pull Request.
 
 ## Architecture
-- `app/src/main/cpp`: Contains the C/C++ core logic. This core is shared with the `SecurePasswd_MGMT` desktop repository. Changes here must maintain functional parity (Identity logic, Search, Argon2id parameters) across all platforms.
+- `core/`: Contains the C/C++ business logic (cryptography, database, and sync). This core is shared with the `SecurePasswd_MGMT` desktop version. Changes here must maintain functional parity (Identity logic, Search, Argon2id parameters) across all platforms.
+- `app/src/main/cpp`: Contains the JNI bridge (`core_jni.cpp`) and Android-specific build configuration.
 - `app/src/main/java/.../ui`: Contains all Jetpack Compose screens.
 
 Please adhere to standard Kotlin `official` style guidelines and standard C `clang-format` conventions.
