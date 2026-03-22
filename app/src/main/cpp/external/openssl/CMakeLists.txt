@@ -176,6 +176,7 @@ list(APPEND OPENSSL_CONFIGURE_OPTIONS -fPIC)
 
 if(ANDROID)
     list(APPEND OPENSSL_CONFIGURE_OPTIONS "-Wno-macro-redefined")
+    list(APPEND OPENSSL_CONFIGURE_OPTIONS "-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}/../../../../=.")
 endif()
 
 if(CMAKE_ANDROID_ARCH_ABI STREQUAL "armeabi-v7a")
@@ -401,5 +402,6 @@ if(OPENSSL_INSTALL_CERT)
 
     # Download latest CA certificates
     # https://curl.se/docs/caextract.html
-    install(CODE "file(DOWNLOAD https://curl.se/ca/cacert.pem ${OPENSSL_OPENSSLDIR}/cert.pem)")
+    # Removed as it breaks reproducible builds by downloading at build/install time.
+    # install(CODE "file(DOWNLOAD https://curl.se/ca/cacert.pem ${OPENSSL_OPENSSLDIR}/cert.pem)")
 endif()

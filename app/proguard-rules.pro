@@ -8,3 +8,7 @@
 -keepclassmembers class com.securepasswd.mgmt.CoreInterop {
     native <methods>;
 }
+
+# Fix R8 non-determinism
+-keep class kotlinx.coroutines.CoroutineExceptionHandler
+-keep class kotlinx.coroutines.internal.MainDispatcherFactory

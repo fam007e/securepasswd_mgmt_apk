@@ -3,6 +3,9 @@ project("securepasswd_mgmt_apk")
 
 # Suppress noisy macro redefinition warnings globally (e.g., __PIC__)
 add_compile_options(-Wno-macro-redefined)
+add_compile_options("-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.")
+add_link_options("LINKER:--build-id=none")
+add_link_options("LINKER:--hash-style=gnu")
 
 # CMAKE_CURRENT_SOURCE_DIR is app/src/main/cpp
 set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../)
