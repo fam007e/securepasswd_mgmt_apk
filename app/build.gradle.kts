@@ -17,8 +17,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "com.securepasswd.mgmt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2026031810 // Base version code for ABI splitting logic
-        versionName = "2026.03.18"
+        versionCode = 2026032210 // Base version code for ABI splitting logic
+        versionName = "2026.03.22"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
