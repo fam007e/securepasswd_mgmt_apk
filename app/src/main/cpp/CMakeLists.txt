@@ -3,12 +3,18 @@ project("securepasswd_mgmt_apk")
 
 # Suppress noisy macro redefinition warnings globally (e.g., __PIC__)
 add_compile_options(-Wno-macro-redefined)
-add_compile_options("-ffile-prefix-map=${CMAKE_CURRENT_SOURCE_DIR}=.")
+# Secure path-independent absolute mappings for reproducibility
+get_filename_component(REAL_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../" ABSOLUTE)
+add_compile_options("-ffile-prefix-map=${REAL_PROJECT_ROOT}=.")
+add_compile_options("-ffile-prefix-map=${ANDROID_NDK}=NDK")
+
 add_link_options("LINKER:--build-id=none")
 add_link_options("LINKER:--hash-style=gnu")
+add_link_options("LINKER:--gc-sections")
+add_link_options("LINKER:--no-undefined")
 
 # CMAKE_CURRENT_SOURCE_DIR is app/src/main/cpp
-set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../../../../)
+set(PROJECT_ROOT ${REAL_PROJECT_ROOT})
 set(CORE_DIR ${PROJECT_ROOT}/core)
 set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external)
 

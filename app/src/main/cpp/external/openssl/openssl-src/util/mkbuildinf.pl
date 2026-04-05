@@ -10,7 +10,7 @@ use strict;
 use warnings;
 
 my ($cflags, $platform) = @ARGV;
-$cflags = "compiler: $cflags";
+$cflags = "compiler: information not available";
 
 my $date = gmtime($ENV{'SOURCE_DATE_EPOCH'} || time()) . " UTC";
 

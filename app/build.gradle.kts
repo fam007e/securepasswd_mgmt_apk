@@ -66,6 +66,14 @@ extensions.configure<ApplicationExtension>("android") {
                 "proguard-rules.pro"
             )
             vcsInfo.include = false
+            ndk {
+                debugSymbolLevel = "none"
+            }
+            externalNativeBuild {
+                cmake {
+                    arguments("-DCMAKE_BUILD_TYPE=Release")
+                }
+            }
         }
     }
     compileOptions {

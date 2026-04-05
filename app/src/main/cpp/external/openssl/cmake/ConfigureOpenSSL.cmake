@@ -82,6 +82,11 @@ function(apply_ccache FILE)
         file(READ ${FILE} MAKEFILE)
         string(REPLACE "\nCC=" "\nCC=ccache " MAKEFILE "${MAKEFILE}")
 
+        # Inject path mapping for reproducibility without leaking it into config strings
+        get_filename_component(REPRO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../" ABSOLUTE)
+        string(REPLACE "\nCNF_CFLAGS=" "\nCNF_CFLAGS=-ffile-prefix-map=${REPRO_ROOT}=. " MAKEFILE "${MAKEFILE}")
+        string(REPLACE "\nCNF_CXXFLAGS=" "\nCNF_CXXFLAGS=-ffile-prefix-map=${REPRO_ROOT}=. " MAKEFILE "${MAKEFILE}")
+
         if(MSVC)
             string(REPLACE "/Zi /Fdossl_static.pdb " "" MAKEFILE "${MAKEFILE}")
             string(REPLACE "/Zi /Fddso.pdb " "" MAKEFILE "${MAKEFILE}")
