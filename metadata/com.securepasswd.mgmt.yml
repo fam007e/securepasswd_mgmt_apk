@@ -9,6 +9,10 @@ AutoName: SecurePasswd MGMT
 
 RepoType: git
 Repo: https://codeberg.org/fam007e/securepasswd_mgmt_apk
+Binaries:
+  - https://codeberg.org/fam007e/securepasswd_mgmt_apk/releases/download/v%v/securepasswd-universal.apk
+AllowedAPKSigningKeys:
+  - 3733b649da5bfaeb3d4e48ddac312875557f6023f45236a54f8ce22ec04531f1
 
 Builds:
   - versionName: 2026.03.22
@@ -17,8 +21,6 @@ Builds:
     subdir: app
     gradle:
       - yes
-    Binaries: https://codeberg.org/fam007e/securepasswd_mgmt_apk/releases/download/v%v/securepasswd-universal.apk
-    AllowedAPKSigningKeys: 3733b649da5bfaeb3d4e48ddac312875557f6023f45236a54f8ce22ec04531f1
 
   - versionName: 2026.03.18
     versionCode: 2026031810
@@ -26,8 +28,6 @@ Builds:
     subdir: app
     gradle:
       - yes
-    Binaries: https://codeberg.org/fam007e/securepasswd_mgmt_apk/releases/download/v%v/securepasswd-universal.apk
-    AllowedAPKSigningKeys: 3733b649da5bfaeb3d4e48ddac312875557f6023f45236a54f8ce22ec04531f1
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
