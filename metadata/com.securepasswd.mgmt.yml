@@ -19,6 +19,9 @@ Builds:
     subdir: app
     gradle:
       - yes
+    gradleprops:
+      - enableSplits=true
+      - target.abis=arm64-v8a,armeabi-v7a
 
   - versionName: 2026.03.22
     versionCode: 2026032210
@@ -26,6 +29,9 @@ Builds:
     subdir: app
     gradle:
       - yes
+    gradleprops:
+      - enableSplits=true
+      - target.abis=arm64-v8a,armeabi-v7a
 
 AllowedAPKSigningKeys: 3733b649da5bfaeb3d4e48ddac312875557f6023f45236a54f8ce22ec04531f1
 
