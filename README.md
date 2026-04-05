@@ -24,18 +24,27 @@ This Android application promises **identical security entropy** to its desktop 
 * **Secure CSV Support:** Plaintext import and export with built-in protection against Formula Injection (CSV injection).
 * **Password Health Checks:** Uses a privacy-preserving k-anonymity request to the [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords) API. Only the first 5 characters of a SHA-1 hash are sent. (Note: This is a monetary-free but proprietary network service, which F-Droid tags as `NonFreeNet`).
 * **Modern Material UI:** Featuring intuitive desktop-like themes utilizing the Jetpack Compose framework.
+* **Binary Transparency:** Supports bit-for-bit reproducible builds, ensuring the distributed APK exactly matches the source code.
 
 ## Build Requirements
 - Android Studio Iguana (or newer)
-- Gradle 8.2+
+- Gradle 9.3+
+- JDK 21
 - Android NDK `25.1.8937393` and CMake `3.22.1`
 
 ## Building from source
 ```bash
 git clone https://codeberg.org/fam007e/securepasswd_mgmt_apk.git
 cd securepasswd_mgmt_apk
-./gradlew assembleDebug
+./gradlew assembleRelease
 ```
+
+### Reproducible Builds
+To verify that the build is bit-for-bit identical across environments:
+1. Ensure you are using **JDK 21**.
+2. Set the deterministic timestamp: `export SOURCE_DATE_EPOCH=1711075200`.
+3. Build the release APK: `./gradlew assembleRelease`.
+4. Compare the SHA-256 hash of the resulting APK with the official release.
 
 ## Contact & Support
 For general inquiries or support, you can reach the maintainer at [email](mailto:faisalmoshiur+securepasswdmgmtapk@gmail.com).

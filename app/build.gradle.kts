@@ -17,8 +17,8 @@ extensions.configure<ApplicationExtension>("android") {
         applicationId = "com.securepasswd.mgmt"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2026032210 // Base version code for ABI splitting logic
-        versionName = "2026.03.22"
+        versionCode = 2026040601 // Base version code for ABI splitting logic
+        versionName = "2026.04.06"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -74,8 +74,17 @@ extensions.configure<ApplicationExtension>("android") {
                     arguments("-DCMAKE_BUILD_TYPE=Release")
                 }
             }
+            signingConfig = signingConfigs.getByName("debug") // Use debug as placeholder or configure release
         }
     }
+
+    signingConfigs {
+        getByName("debug") {
+            isV1SigningEnabled = false
+            isV2SigningEnabled = true
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -85,11 +94,16 @@ extensions.configure<ApplicationExtension>("android") {
         compose = true
         buildConfig = true
     }
+
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
+        jniLibs {
+            useLegacyPackaging = false
+        }
     }
+
     externalNativeBuild {
         cmake {
             path("src/main/cpp/CMakeLists.txt")

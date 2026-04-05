@@ -7,7 +7,8 @@ Thank you for your interest! We welcome pull requests.
 2. Clone your fork locally.
 3. Make sure to have Android NDK installed (`./gradlew` will usually download it automatically depending on your system config).
 4. Run all tests locally before submitting: `./gradlew test` and `./gradlew assembleDebug`.
-5. Submit a Pull Request.
+5. **Verify Reproducibility:** Ensure your changes do not break bit-for-bit reproducibility by comparing hashes of two consecutive builds with `SOURCE_DATE_EPOCH` set.
+6. Submit a Pull Request.
 
 ## Architecture
 - `core/`: Contains the C/C++ business logic (cryptography, database, and sync). This core is shared with the `SecurePasswd_MGMT` desktop version. Changes here must maintain functional parity (Identity logic, Search, Argon2id parameters) across all platforms.

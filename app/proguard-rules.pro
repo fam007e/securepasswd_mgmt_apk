@@ -12,3 +12,8 @@
 # Fix R8 non-determinism
 -keep class kotlinx.coroutines.CoroutineExceptionHandler
 -keep class kotlinx.coroutines.internal.MainDispatcherFactory
+
+# Reproducibility: Remove source file attributes that leak local paths
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+-keepattributes EnclosingMethod,InnerClasses,Signature,AnnotationDefault

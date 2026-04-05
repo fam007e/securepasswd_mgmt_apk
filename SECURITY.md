@@ -18,6 +18,7 @@ Critical Security Implementations:
    - **FLAG_SECURE:** Prevents screenshots, screen recording, and exposure in recent task lists.
    - **Sensitive Clipboard:** Utilizes `EXTRA_IS_SENSITIVE` flags for Android 13+ and automatic clearing after 30 seconds.
    - **Network Privacy:** Cleartext traffic is disabled globally; HIBP checks use k-Anonymity (anonymized hash ranges).
+   - **Deterministic Builds:** Bit-for-bit reproducibility ensures that any user can verify that the distributed binary is the exact output of the provided source code.
 
 ## Reporting a Vulnerability
 If you discover a security vulnerability, please do NOT report it via public issues on Codeberg.

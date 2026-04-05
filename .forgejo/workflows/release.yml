@@ -53,6 +53,8 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Release APK
+        env:
+          SOURCE_DATE_EPOCH: "1711075200"
         run: ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --stacktrace
 
       - name: Sign APK
@@ -88,6 +90,7 @@ jobs:
               --ks-pass env:KEYSTORE_PASSWORD \
               --key-pass env:KEY_PASSWORD \
               --v4-signing-enabled false \
+              --deterministic-timestamp \
               --out "signed-apks/$new_name" \
               "$apk"
 

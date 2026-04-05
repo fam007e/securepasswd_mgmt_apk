@@ -1,0 +1,4 @@
+- Bit-for-bit build reproducibility improvements for F-Droid compliance.
+- Switched to deterministic APK packaging and signing.
+- Updated CI/CD workflows to align with F-Droid's build environment.
+- Native library path stripping to remove local build environment leaks.
