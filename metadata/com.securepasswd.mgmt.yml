@@ -12,28 +12,29 @@ Repo: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 Binaries: 
   https://codeberg.org/fam007e/securepasswd_mgmt_apk/releases/download/v%v/securepasswd-universal.apk
 
-
 Builds:
   - versionName: 2026.03.18
     versionCode: 2026031810
     commit: 614034d8bceeb892896ca24e660698c85caac1a4
     subdir: app
+    ndk: r25c
     gradle:
-      - yes
+      - :app:assembleRelease
     output: build/outputs/apk/release/app-universal-release-unsigned.apk
     gradleprops:
-      - enableSplits=true
+      - enableSplits
       - target.abis=arm64-v8a,armeabi-v7a
 
   - versionName: 2026.03.22
     versionCode: 2026032210
     commit: v2026.03.22
     subdir: app
+    ndk: r25c
     gradle:
-      - yes
+      - :app:assembleRelease
     output: build/outputs/apk/release/app-universal-release-unsigned.apk
     gradleprops:
-      - enableSplits=true
+      - enableSplits
       - target.abis=arm64-v8a,armeabi-v7a
 
 AllowedAPKSigningKeys: 3733b649da5bfaeb3d4e48ddac312875557f6023f45236a54f8ce22ec04531f1
