@@ -90,7 +90,6 @@ jobs:
               --ks-pass env:KEYSTORE_PASSWORD \
               --key-pass env:KEY_PASSWORD \
               --v4-signing-enabled false \
-              --deterministic-timestamp \
               --out "signed-apks/$new_name" \
               "$apk"
 
