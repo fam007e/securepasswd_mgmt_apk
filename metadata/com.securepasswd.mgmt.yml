@@ -9,8 +9,9 @@ AutoName: SecurePasswd MGMT
 
 RepoType: git
 Repo: https://codeberg.org/fam007e/securepasswd_mgmt_apk
-Binaries:
+Binaries: 
   https://codeberg.org/fam007e/securepasswd_mgmt_apk/releases/download/v%v/securepasswd-universal.apk
+
 
 Builds:
   - versionName: 2026.03.18
