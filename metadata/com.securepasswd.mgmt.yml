@@ -15,7 +15,7 @@ Binaries:
 Builds:
   - versionName: 2026.04.06
     versionCode: 2026040601
-    commit: 8cbca802e1fea456134635ebcd5bdf46668c65bf
+    commit: fd446c22511c78f0e1df2a78d25a2bf99798b550
     subdir: app
     gradle:
       - yes
