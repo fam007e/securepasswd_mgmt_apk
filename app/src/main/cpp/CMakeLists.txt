@@ -3,15 +3,25 @@ project("securepasswd_mgmt_apk")
 
 # Suppress noisy macro redefinition warnings globally (e.g., __PIC__)
 add_compile_options(-Wno-macro-redefined)
+
 # Secure path-independent absolute mappings for reproducibility
 get_filename_component(REAL_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../" ABSOLUTE)
+
+# Strip all possible path leaks (Source, Macros, and Debug Symbols)
 add_compile_options("-ffile-prefix-map=${REAL_PROJECT_ROOT}=.")
 add_compile_options("-ffile-prefix-map=${ANDROID_NDK}=NDK")
+add_compile_options("-fmacro-prefix-map=${REAL_PROJECT_ROOT}=.")
+add_compile_options("-fdebug-prefix-map=${REAL_PROJECT_ROOT}=.")
 
-add_link_options("LINKER:--build-id=none")
-add_link_options("LINKER:--hash-style=gnu")
-add_link_options("LINKER:--gc-sections")
-add_link_options("LINKER:--no-undefined")
+# Remove non-deterministic ELF sections (like compiler version strings)
+add_link_options("-Wl,--exclude-libs,ALL")
+add_link_options("-Wl,--build-id=none")
+add_link_options("-Wl,--hash-style=gnu")
+add_link_options("-Wl,--gc-sections")
+add_link_options("-Wl,--no-undefined")
+add_link_options("-Wl,-z,noexecstack")
+add_link_options("-Wl,-z,relro")
+add_link_options("-Wl,-z,now")
 
 # CMAKE_CURRENT_SOURCE_DIR is app/src/main/cpp
 set(PROJECT_ROOT ${REAL_PROJECT_ROOT})

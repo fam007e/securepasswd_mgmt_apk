@@ -77,13 +77,6 @@ extensions.configure<ApplicationExtension>("android") {
         }
     }
 
-    signingConfigs {
-        getByName("debug") {
-            isV1SigningEnabled = false
-            isV2SigningEnabled = true
-        }
-    }
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
