@@ -317,7 +317,7 @@ int database_add(PasswordEntry *entry) {
     }
 
     sqlite3_finalize(stmt);
-    return 0;
+    return (int)sqlite3_last_insert_rowid(db);
 }
 
 int database_update(PasswordEntry *entry) {

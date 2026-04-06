@@ -104,7 +104,6 @@ private suspend fun handleSync(
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
             onSyncComplete()
         }
-    } else {
-        onProgress("Sync failed. Ensure devices are on the same network.")
     }
+    // Error is already passed to onProgress by performSync
 }

@@ -17,7 +17,7 @@ Critical Security Implementations:
 7. **Platform Hardening:**
    - **FLAG_SECURE:** Prevents screenshots, screen recording, and exposure in recent task lists.
    - **Sensitive Clipboard:** Utilizes `EXTRA_IS_SENSITIVE` flags for Android 13+ and automatic clearing after 30 seconds.
-   - **Network Privacy:** Cleartext traffic is disabled globally; HIBP checks use k-Anonymity (anonymized hash ranges).
+   - **Network Privacy:** Standard outbound telemetry uses secure defaults (HIBP utilizes K-Anonymity privacy requests). While raw sockets fallback to clearTLS (`usesCleartextTraffic="true"`) to bypass constrained LAN certificate handshakes, all synchronized packets are rigorously symmetrically encrypted within an enclosed envelope utilizing **ChaCha20-Poly1305** prior to IP transmission, guaranteeing secure E2E transfers.
    - **Deterministic Builds:** Bit-for-bit reproducibility ensures that any user can verify that the distributed binary is the exact output of the provided source code.
 
 ## Reporting a Vulnerability

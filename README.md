@@ -21,6 +21,7 @@ This Android application promises **identical security entropy** to its desktop 
 * **Zero-Knowledge Architecture:** No telemetry or tracking.
 * **Advanced Navigation:** Real-time search, global alphabetical sorting, and sticky headers for efficient vault management.
 * **Conflict-Aware Merging:** A Git-style "Merge Review" engine that detects and resolves duplicates/conflicts during imports or syncs, preventing data loss.
+* **Local Network QR Sync:** Direct device-to-device remote encrypted data transfers over TCP using raw socket channels, symmetrically encrypted end-to-end via **ChaCha20-Poly1305** authentication tag verification.
 * **Secure CSV Support:** Plaintext import and export with built-in protection against Formula Injection (CSV injection).
 * **Password Health Checks:** Uses a privacy-preserving k-anonymity request to the [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords) API. Only the first 5 characters of a SHA-1 hash are sent. (Note: This is a monetary-free but proprietary network service, which F-Droid tags as `NonFreeNet`).
 * **Modern Material UI:** Featuring intuitive desktop-like themes utilizing the Jetpack Compose framework.

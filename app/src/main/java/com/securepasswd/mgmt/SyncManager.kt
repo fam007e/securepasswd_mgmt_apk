@@ -23,14 +23,16 @@ object SyncManager {
             onProgress("Connecting to $ip:$port...")
             val socket = Socket()
             socket.connect(InetSocketAddress(ip, port), 5000)
-            
+
             onProgress("Connected! Receiving data...")
             val inputStream: InputStream = socket.getInputStream()
             val encryptedBytes = inputStream.readBytes()
             socket.close()
 
             if (encryptedBytes.isEmpty()) {
-                Log.e(TAG, "Received empty data")
+                val err = "Received empty data from desktop."
+                Log.e(TAG, err)
+                onProgress(err)
                 key.fill(0)
                 return@withContext false
             }
@@ -45,7 +47,7 @@ object SyncManager {
             // Decrypt to a staging file instead of replacing immediately
             val stagingDbPath = context.filesDir.absolutePath + "/vault_sync_staging.db"
             val result = CoreInterop.syncDecryptVault(encryptedBytes, stagingDbPath, key)
-            
+
             // Zero key immediately after use
             key.fill(0)
 
@@ -53,10 +55,13 @@ object SyncManager {
                 onProgress("Decryption successful! Preparing to finalize...")
                 return@withContext true
             } else {
+                val err = "Decryption failed (native code $result)"
                 Log.e(TAG, "Decryption failed with result: $result")
+                onProgress(err)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Sync failed", e)
+            onProgress("Connection error: ${e.message ?: "Unknown"}")
             key.fill(0)
         }
         return@withContext false
@@ -66,23 +71,23 @@ object SyncManager {
         try {
             val stagingDb = java.io.File(context.filesDir, "vault_sync_staging.db")
             val stagingSalt = java.io.File(context.filesDir, "vault_sync_staging.db.salt")
-            
+
             val targetDb = java.io.File(context.filesDir, "vault.db")
             val targetSalt = java.io.File(context.filesDir, "vault.db.salt")
 
             if (stagingDb.exists() && stagingSalt.exists()) {
                 Log.d(TAG, "Finalizing sync replacement. Staging DB size: ${stagingDb.length()}")
-                
+
                 // Nuclear option: delete old files first to ensure no locks
                 if (targetDb.exists()) targetDb.delete()
                 if (targetSalt.exists()) targetSalt.delete()
-                
+
                 stagingDb.copyTo(targetDb, overwrite = true)
                 stagingSalt.copyTo(targetSalt, overwrite = true)
-                
+
                 stagingDb.delete()
                 stagingSalt.delete()
-                
+
                 Log.d(TAG, "Sync finalization complete.")
                 return true
             } else {
