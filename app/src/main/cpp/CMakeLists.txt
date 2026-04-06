@@ -8,13 +8,19 @@ add_compile_options(-Wno-macro-redefined)
 get_filename_component(REAL_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../" ABSOLUTE)
 
 # Strip all possible path leaks (Source, Macros, and Debug Symbols)
+# Using CMAKE_ANDROID_NDK which is set by AGP
 add_compile_options("-ffile-prefix-map=${REAL_PROJECT_ROOT}=.")
-add_compile_options("-ffile-prefix-map=${ANDROID_NDK}=NDK")
+add_compile_options("-ffile-prefix-map=${CMAKE_ANDROID_NDK}=NDK")
 add_compile_options("-fmacro-prefix-map=${REAL_PROJECT_ROOT}=.")
+add_compile_options("-fmacro-prefix-map=${CMAKE_ANDROID_NDK}=NDK")
 add_compile_options("-fdebug-prefix-map=${REAL_PROJECT_ROOT}=.")
+add_compile_options("-fdebug-prefix-map=${CMAKE_ANDROID_NDK}=NDK")
 
-# Remove non-deterministic ELF sections (like compiler version strings)
-add_link_options("-Wl,--exclude-libs,ALL")
+# Remove non-deterministic ELF sections and strings
+add_compile_options("-fno-ident")
+add_compile_options("-fno-asynchronous-unwind-tables")
+
+# Linker flags for reproducibility
 add_link_options("-Wl,--build-id=none")
 add_link_options("-Wl,--hash-style=gnu")
 add_link_options("-Wl,--gc-sections")
@@ -42,6 +48,8 @@ target_include_directories(argon2 PUBLIC ${argon2_SOURCE_DIR}/include)
 
 # OpenSSL (Vendored via openssl-cmake wrapper)
 set(OPENSSL_SOURCE ${EXTERNAL_DIR}/openssl/openssl-src)
+# Pass reproducibility environment to OpenSSL build
+set(ENV{SOURCE_DATE_EPOCH} "1711075200")
 add_subdirectory(${EXTERNAL_DIR}/openssl EXCLUDE_FROM_ALL)
 
 # SQLCipher (Vendored Amalgamation)
