@@ -7,7 +7,6 @@
 <p align="center">
   <a href="https://codeberg.org/fam007e/securepasswd_mgmt_apk/actions/workflows/android-build.yml"><img src="https://codeberg.org/fam007e/securepasswd_mgmt_apk/actions/workflows/android-build.yml/badge.svg" alt="Build Status"></a>
   <a href="https://codeberg.org/fam007e/securepasswd_mgmt_apk/actions/workflows/release.yml"><img src="https://codeberg.org/fam007e/securepasswd_mgmt_apk/actions/workflows/release.yml/badge.svg" alt="Release Status"></a>
-  <a href="https://f-droid.org/packages/com.securepasswd.mgmt/"><img src="https://img.shields.io/f-droid/v/com.securepasswd.mgmt?logo=f-droid&logoColor=white" alt="F-Droid"></a>
 </p>
 
 A native port of the `SecurePasswd_MGMT` desktop application to Android using Jetpack Compose, Kotlin, and the C++ Android NDK.
@@ -25,7 +24,7 @@ This Android application promises **identical security entropy** to its desktop 
 * **Secure CSV Support:** Plaintext import and export with built-in protection against Formula Injection (CSV injection).
 * **Password Health Checks:** Uses a privacy-preserving k-anonymity request to the [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords) API. Only the first 5 characters of a SHA-1 hash are sent. (Note: This is a monetary-free but proprietary network service, which F-Droid tags as `NonFreeNet`).
 * **Modern Material UI:** Featuring intuitive desktop-like themes utilizing the Jetpack Compose framework.
-* **Binary Transparency:** Supports bit-for-bit reproducible builds, ensuring the distributed APK exactly matches the source code.
+* **Binary Transparency:** Supports bit-for-bit **reproducible builds**. Our build system is hardened with prefix-mapping and ELF stripping to ensure the distributed APK exactly matches the source code regardless of the local build path.
 
 ## Build Requirements
 - Android Studio Iguana (or newer)

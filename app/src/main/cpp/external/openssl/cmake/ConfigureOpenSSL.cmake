@@ -72,29 +72,51 @@ function(apply_ccache FILE)
         message(FATAL_ERROR "Couldn't find Makefile")
     endif()
 
+    file(READ ${FILE} MAKEFILE)
+
     if(OPENSSL_USE_CCACHE)
         find_program(CCACHE ccache)
-
-        if(NOT CCACHE)
-            return()
+        if(CCACHE)
+            string(REPLACE "\nCC=" "\nCC=ccache " MAKEFILE "${MAKEFILE}")
         endif()
-
-        file(READ ${FILE} MAKEFILE)
-        string(REPLACE "\nCC=" "\nCC=ccache " MAKEFILE "${MAKEFILE}")
-
-        # Inject path mapping for reproducibility without leaking it into config strings
-        get_filename_component(REPRO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../" ABSOLUTE)
-        string(REPLACE "\nCNF_CFLAGS=" "\nCNF_CFLAGS=-ffile-prefix-map=${REPRO_ROOT}=. " MAKEFILE "${MAKEFILE}")
-        string(REPLACE "\nCNF_CXXFLAGS=" "\nCNF_CXXFLAGS=-ffile-prefix-map=${REPRO_ROOT}=. " MAKEFILE "${MAKEFILE}")
-
-        if(MSVC)
-            string(REPLACE "/Zi /Fdossl_static.pdb " "" MAKEFILE "${MAKEFILE}")
-            string(REPLACE "/Zi /Fddso.pdb " "" MAKEFILE "${MAKEFILE}")
-            string(REPLACE "/Zi /Fdapp.pdb " "" MAKEFILE "${MAKEFILE}")
-        endif()
-
-        file(WRITE ${FILE} "${MAKEFILE}")
     endif()
+
+    # Inject path mapping for reproducibility without leaking it into config strings
+    # We need to go 6 levels up from app/src/main/cpp/external/openssl to reach the root
+    get_filename_component(REPRO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../../../../" ABSOLUTE)
+    
+    # Comprehensive prefix mapping for all supported compilers/assemblers
+    set(REPRO_FLAGS 
+        "-ffile-prefix-map=${REPRO_ROOT}=."
+        "-ffile-prefix-map=${CMAKE_ANDROID_NDK}=NDK"
+        "-fmacro-prefix-map=${REPRO_ROOT}=."
+        "-fmacro-prefix-map=${CMAKE_ANDROID_NDK}=NDK"
+        "-fdebug-prefix-map=${REPRO_ROOT}=."
+        "-fdebug-prefix-map=${CMAKE_ANDROID_NDK}=NDK"
+    )
+    
+    # Convert list to space-separated string
+    string(REPLACE ";" " " REPRO_FLAGS_STR "${REPRO_FLAGS}")
+    
+    # Inject into configuration flags
+    string(REPLACE "\nCNF_CFLAGS=" "\nCNF_CFLAGS=${REPRO_FLAGS_STR} " MAKEFILE "${MAKEFILE}")
+    string(REPLACE "\nCNF_CXXFLAGS=" "\nCNF_CXXFLAGS=${REPRO_FLAGS_STR} " MAKEFILE "${MAKEFILE}")
+    string(REPLACE "\nCNF_CPPFLAGS=" "\nCNF_CPPFLAGS=${REPRO_FLAGS_STR} " MAKEFILE "${MAKEFILE}")
+    string(REPLACE "\nCNF_ASFLAGS=" "\nCNF_ASFLAGS=${REPRO_FLAGS_STR} " MAKEFILE "${MAKEFILE}")
+    
+    # Also inject into user flags to be certain
+    string(REPLACE "\nCFLAGS=" "\nCFLAGS=${REPRO_FLAGS_STR} " MAKEFILE "${MAKEFILE}")
+    string(REPLACE "\nCXXFLAGS=" "\nCXXFLAGS=${REPRO_FLAGS_STR} " MAKEFILE "${MAKEFILE}")
+    string(REPLACE "\nCPPFLAGS=" "\nCPPFLAGS=${REPRO_FLAGS_STR} " MAKEFILE "${MAKEFILE}")
+    string(REPLACE "\nASFLAGS=" "\nASFLAGS=${REPRO_FLAGS_STR} " MAKEFILE "${MAKEFILE}")
+
+    if(MSVC)
+        string(REPLACE "/Zi /Fdossl_static.pdb " "" MAKEFILE "${MAKEFILE}")
+        string(REPLACE "/Zi /Fddso.pdb " "" MAKEFILE "${MAKEFILE}")
+        string(REPLACE "/Zi /Fdapp.pdb " "" MAKEFILE "${MAKEFILE}")
+    endif()
+
+    file(WRITE ${FILE} "${MAKEFILE}")
 endfunction()
 
 function(configure_openssl)

@@ -9,16 +9,18 @@ get_filename_component(REAL_PROJECT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.
 
 # Strip all possible path leaks (Source, Macros, and Debug Symbols)
 # Using CMAKE_ANDROID_NDK which is set by AGP
-add_compile_options("-ffile-prefix-map=${REAL_PROJECT_ROOT}=.")
-add_compile_options("-ffile-prefix-map=${CMAKE_ANDROID_NDK}=NDK")
-add_compile_options("-fmacro-prefix-map=${REAL_PROJECT_ROOT}=.")
-add_compile_options("-fmacro-prefix-map=${CMAKE_ANDROID_NDK}=NDK")
-add_compile_options("-fdebug-prefix-map=${REAL_PROJECT_ROOT}=.")
-add_compile_options("-fdebug-prefix-map=${CMAKE_ANDROID_NDK}=NDK")
+set(REPRO_FLAGS 
+    "-ffile-prefix-map=${REAL_PROJECT_ROOT}=."
+    "-ffile-prefix-map=${CMAKE_ANDROID_NDK}=NDK"
+    "-fmacro-prefix-map=${REAL_PROJECT_ROOT}=."
+    "-fmacro-prefix-map=${CMAKE_ANDROID_NDK}=NDK"
+    "-fdebug-prefix-map=${REAL_PROJECT_ROOT}=."
+    "-fdebug-prefix-map=${CMAKE_ANDROID_NDK}=NDK"
+    "-fno-ident"
+    "-fno-asynchronous-unwind-tables"
+)
 
-# Remove non-deterministic ELF sections and strings
-add_compile_options("-fno-ident")
-add_compile_options("-fno-asynchronous-unwind-tables")
+add_compile_options(${REPRO_FLAGS})
 
 # Linker flags for reproducibility
 add_link_options("-Wl,--build-id=none")

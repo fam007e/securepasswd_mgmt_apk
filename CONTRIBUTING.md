@@ -7,7 +7,7 @@ Thank you for your interest! We welcome pull requests.
 2. Clone your fork locally.
 3. Make sure to have Android NDK installed (`./gradlew` will usually download it automatically depending on your system config).
 4. Run all tests locally before submitting: `./gradlew test` and `./gradlew assembleDebug`.
-5. **Verify Reproducibility:** Ensure your changes do not break bit-for-bit reproducibility by comparing hashes of two consecutive builds with `SOURCE_DATE_EPOCH` set.
+5. **Verify Reproducibility:** Ensure your changes do not break bit-for-bit reproducibility. After building, run `strings` on the resulting `.so` library and verify no local absolute paths leak into the binary.
 6. Submit a Pull Request.
 
 ## Architecture

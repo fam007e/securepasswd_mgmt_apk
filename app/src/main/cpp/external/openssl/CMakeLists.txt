@@ -180,11 +180,14 @@ set(ENV{SOURCE_DATE_EPOCH} "1711075200") # Fixed date for reproducibility
 if(ANDROID)
     list(APPEND OPENSSL_CONFIGURE_OPTIONS "-Wno-macro-redefined")
     # THE PATH MAPPING IS NOW INJECTED INTO THE MAKEFILE LATER TO AVOID STRING EMBEDDING LEAKS
+    
+    # Enforce no-asm for all Android ABIs to maximize reproducibility across different environments
+    # as assembly generation can sometimes be a source of non-determinism.
+    list(APPEND OPENSSL_CONFIGURE_OPTIONS "no-asm")
 endif()
 
 if(CMAKE_ANDROID_ARCH_ABI STREQUAL "armeabi-v7a")
     list(APPEND OPENSSL_CONFIGURE_OPTIONS "-D__PIC__=1")
-    list(APPEND OPENSSL_CONFIGURE_OPTIONS "no-asm")
 endif()
 
 list(PREPEND OPENSSL_CONFIGURE_OPTIONS ${OPENSSL_TARGET_PLATFORM})

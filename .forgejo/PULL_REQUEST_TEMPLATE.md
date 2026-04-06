@@ -16,5 +16,5 @@
 
 ## Checklist
 - [ ] I have performed a self-review of my own code
-- [ ] I have verified the code builds locally (`./gradlew assembleDebug`)
+- [ ] I have verified that no absolute paths leak into the native binary via `strings` audit
 - [ ] I have added tests that prove my fix is effective or that my feature works
