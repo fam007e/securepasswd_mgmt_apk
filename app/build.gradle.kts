@@ -74,7 +74,6 @@ extensions.configure<ApplicationExtension>("android") {
                     arguments("-DCMAKE_BUILD_TYPE=Release")
                 }
             }
-            signingConfig = signingConfigs.getByName("debug") // Use debug as placeholder or configure release
         }
     }
 
