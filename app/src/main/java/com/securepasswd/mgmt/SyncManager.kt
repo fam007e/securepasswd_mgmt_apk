@@ -21,47 +21,58 @@ object SyncManager {
         val key = hexToBytes(keyHex)
         try {
             onProgress("Connecting to $ip:$port...")
-            val socket = Socket()
-            socket.connect(InetSocketAddress(ip, port), 5000)
+            Log.d(TAG, "Attempting connection to $ip:$port")
+            
+            Socket().use { socket ->
+                socket.soTimeout = 10000 // 10s read timeout
+                socket.connect(InetSocketAddress(ip, port), 10000) // 10s connect timeout
 
-            onProgress("Connected! Receiving data...")
-            val inputStream: InputStream = socket.getInputStream()
-            val encryptedBytes = inputStream.readBytes()
-            socket.close()
+                onProgress("Connected! Receiving data...")
+                val inputStream: InputStream = socket.getInputStream()
+                val encryptedBytes = inputStream.readBytes()
 
-            if (encryptedBytes.isEmpty()) {
-                val err = "Received empty data from desktop."
-                Log.e(TAG, err)
-                onProgress(err)
+                if (encryptedBytes.isEmpty()) {
+                    val err = "Received empty data from desktop. Check if the desktop app is still running and the vault is not empty."
+                    Log.e(TAG, err)
+                    onProgress(err)
+                    key.fill(0)
+                    return@withContext false
+                }
+
+                onProgress("Decrypting vault (${encryptedBytes.size} bytes)...")
+                if (key.size != 32) {
+                    Log.e(TAG, "Invalid key size: ${key.size}")
+                    key.fill(0)
+                    return@withContext false
+                }
+
+                // Decrypt to a staging file instead of replacing immediately
+                val stagingDbPath = context.filesDir.absolutePath + "/vault_sync_staging.db"
+                val result = CoreInterop.syncDecryptVault(encryptedBytes, stagingDbPath, key)
+
+                // Zero key immediately after use
                 key.fill(0)
-                return@withContext false
+
+                if (result == 0) {
+                    onProgress("Decryption successful! Preparing to finalize...")
+                    return@withContext true
+                } else {
+                    val err = "Decryption failed (native code $result). Key mismatch or corrupted data."
+                    Log.e(TAG, "Decryption failed with result: $result")
+                    onProgress(err)
+                }
             }
-
-            onProgress("Decrypting vault...")
-            if (key.size != 32) {
-                Log.e(TAG, "Invalid key size: ${key.size}")
-                key.fill(0)
-                return@withContext false
-            }
-
-            // Decrypt to a staging file instead of replacing immediately
-            val stagingDbPath = context.filesDir.absolutePath + "/vault_sync_staging.db"
-            val result = CoreInterop.syncDecryptVault(encryptedBytes, stagingDbPath, key)
-
-            // Zero key immediately after use
+        } catch (e: java.net.SocketTimeoutException) {
+            Log.e(TAG, "Sync timeout", e)
+            onProgress("Connection timeout. Ensure both devices are on the same WiFi and no firewall/VPN is blocking the connection (Port: $port).")
             key.fill(0)
-
-            if (result == 0) {
-                onProgress("Decryption successful! Preparing to finalize...")
-                return@withContext true
-            } else {
-                val err = "Decryption failed (native code $result)"
-                Log.e(TAG, "Decryption failed with result: $result")
-                onProgress(err)
-            }
+        } catch (e: java.net.ConnectException) {
+            Log.e(TAG, "Sync connection refused", e)
+            onProgress("Connection refused. Check if the Desktop sync server is active and listening on $ip.")
+            key.fill(0)
         } catch (e: Exception) {
             Log.e(TAG, "Sync failed", e)
-            onProgress("Connection error: ${e.message ?: "Unknown"}")
+            onProgress("Sync error: ${e.message ?: "Unknown error"}")
             key.fill(0)
         }
         return@withContext false
