@@ -120,6 +120,15 @@ void sync_transcript_hash(const uint8_t client_pub[SYNC_EPHEMERAL_LEN],
     EVP_MD_CTX_free(ctx);
 }
 
+int sync_ct_equal(const uint8_t *a, const uint8_t *b, size_t len) {
+    if (!a || !b) return 0;
+    uint8_t diff = 0;
+    for (size_t i = 0; i < len; i++) diff |= a[i] ^ b[i];
+    /* diff == 0 iff equal; (unsigned)(diff - 1) >> 8 is 1 only when diff==0
+     * (borrow wraps), giving a branch-free 1/0. */
+    return (int)(((unsigned)(diff - 1u)) >> 8 & 1u);
+}
+
 int sync_session_derive(sync_role_t role,
                         const uint8_t psk[SYNC_PSK_LEN],
                         const uint8_t client_pub[SYNC_EPHEMERAL_LEN],
@@ -156,24 +165,38 @@ int sync_session_derive(sync_role_t role,
     EVP_PKEY_free(peer);
     if (!ok) return -1;
 
-    /* HKDF-SHA256: ikm = X25519 shared secret, salt = PSK, info = protocol. */
+    /* HKDF-SHA256: ikm = X25519 shared secret, salt = PSK,
+     * info = protocol label || handshake transcript hash (channel binding:
+     * the keys are cryptologically tied to this exact handshake, defeating
+     * unknown-key-share style confusions between sessions). */
+    uint8_t transcript[32];
+    sync_transcript_hash(client_pub, server_pub, transcript);
+
     EVP_PKEY_CTX *kctx = EVP_PKEY_CTX_new_id(EVP_PKEY_HKDF, NULL);
     if (!kctx) {
         sp_secure_zero(shared, sizeof(shared));
+        sp_secure_zero(transcript, sizeof(transcript));
         return -1;
     }
 
     uint8_t material[SYNC_SESSION_MATERIAL_LEN];
     size_t material_len = sizeof(material);
+    uint8_t info[64];
+    static const char *label = SPSYNC_HKDF_INFO;
+    size_t label_len = strlen(label);
+    memcpy(info, label, label_len);
+    memcpy(info + label_len, transcript, sizeof(transcript));
+    sp_secure_zero(transcript, sizeof(transcript));
+
     ok = EVP_PKEY_derive_init(kctx) == 1 &&
          EVP_PKEY_CTX_set_hkdf_md(kctx, EVP_sha256()) == 1 &&
          EVP_PKEY_CTX_set1_hkdf_salt(kctx, psk, SYNC_PSK_LEN) == 1 &&
          EVP_PKEY_CTX_set1_hkdf_key(kctx, shared, (int)shared_len) == 1 &&
-         EVP_PKEY_CTX_add1_hkdf_info(kctx,
-             (const unsigned char *)SPSYNC_HKDF_INFO,
-             strlen(SPSYNC_HKDF_INFO)) == 1 &&
+         EVP_PKEY_CTX_add1_hkdf_info(kctx, info,
+             (int)(label_len + sizeof(transcript))) == 1 &&
          EVP_PKEY_derive(kctx, material, &material_len) == 1 &&
          material_len == sizeof(material);
+    sp_secure_zero(info, sizeof(info));
     EVP_PKEY_CTX_free(kctx);
     sp_secure_zero(shared, sizeof(shared));
     if (!ok) return -1;

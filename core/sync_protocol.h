@@ -132,6 +132,13 @@ void sync_transcript_hash(const uint8_t client_pub[SYNC_EPHEMERAL_LEN],
                           const uint8_t server_pub[SYNC_EPHEMERAL_LEN],
                           uint8_t out_hash[32]);
 
+/**
+ * Constant-time comparison of two equal-length byte strings.
+ * @return 1 when equal, 0 otherwise. Use for key-confirmation checks so
+ *         failure timing does not leak matching prefixes.
+ */
+int sync_ct_equal(const uint8_t *a, const uint8_t *b, size_t len);
+
 /* ----------------------------- frames ----------------------------- */
 
 /**

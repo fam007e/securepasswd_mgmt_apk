@@ -92,7 +92,9 @@ object SyncManager {
                 val localTranscript = CoreInterop.syncGetTranscriptHash(sessionHandle)
                     ?: return@withContext SyncResult.Failure("Failed to compute transcript hash")
 
-                if (!Arrays.equals(serverConfirmPayload, localTranscript)) {
+                // MessageDigest.isEqual is constant-time (defense in depth; the
+                // transcript hash is not secret, but compare it the right way anyway).
+                if (!java.security.MessageDigest.isEqual(serverConfirmPayload, localTranscript)) {
                     return@withContext SyncResult.Failure("Key confirmation mismatch: desktop pairing key does not match")
                 }
 
