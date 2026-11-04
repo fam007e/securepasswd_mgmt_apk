@@ -41,6 +41,8 @@ fun VaultScreen(
     onBulkHealthCheck: (List<PasswordEntry>) -> Unit = {},
     isDarkTheme: Boolean = true,
     onToggleTheme: () -> Unit = {},
+    palette: String = "nord",
+    onSelectPalette: (String) -> Unit = {},
     totpViewModel: TotpViewModel = viewModel()
 ) {
     val refreshTrigger by totpViewModel.refreshTrigger.collectAsState()
@@ -48,6 +50,7 @@ fun VaultScreen(
 
     // ── Search & Filter state ────────────────────────────────────────────────
     var searchQuery by remember { mutableStateOf("") }
+    var showPaletteDialog by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
 
     val filteredAndSortedEntries = remember(entries, searchQuery) {
@@ -268,6 +271,13 @@ fun VaultScreen(
                                 onDismissRequest = { showMenu = false }
                             ) {
                                 DropdownMenuItem(
+                                    text = { Text("Color Palette") },
+                                    onClick = {
+                                        showMenu = false
+                                        showPaletteDialog = true
+                                    }
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Sync from Desktop") },
                                     onClick = {
                                         showMenu = false
@@ -448,6 +458,47 @@ fun VaultScreen(
             }
         }
     }
+    if (showPaletteDialog) {
+        AlertDialog(
+            onDismissRequest = { showPaletteDialog = false },
+            title = { Text("Color Palette") },
+            text = {
+                Column {
+                    com.securepasswd.mgmt.ui.theme.Palettes.ALL.forEach { id ->
+                        val label = when (id) {
+                            com.securepasswd.mgmt.ui.theme.Palettes.NORD -> "Nord (default)"
+                            com.securepasswd.mgmt.ui.theme.Palettes.DRACULA -> "Dracula"
+                            else -> "Solarized"
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = palette == id,
+                                onClick = {
+                                    onSelectPalette(id)
+                                    showPaletteDialog = false
+                                }
+                            )
+                            Text(label, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                    Text(
+                        "Dark or light follows your system theme unless toggled.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPaletteDialog = false }) { Text("Done") }
+            }
+        )
+    }
+
 }
 
 @OptIn(ExperimentalFoundationApi::class)

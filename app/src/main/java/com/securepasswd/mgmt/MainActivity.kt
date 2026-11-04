@@ -58,8 +58,11 @@ class MainActivity : ComponentActivity() {
             }
             val systemDark = isSystemInDarkTheme()
             val currentDark = isDarkTheme ?: systemDark
+            var palette by remember {
+                mutableStateOf(prefs.getString("palette", "nord") ?: "nord")
+            }
 
-            SecurePasswdTheme(darkTheme = currentDark) {
+            SecurePasswdTheme(darkTheme = currentDark, palette = palette) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -80,6 +83,11 @@ class MainActivity : ComponentActivity() {
                             val newDark = !currentDark
                             isDarkTheme = newDark
                             prefs.edit().putBoolean("dark_theme", newDark).apply()
+                        },
+                        palette = palette,
+                        onSelectPalette = { selected ->
+                            palette = selected
+                            prefs.edit().putString("palette", selected).apply()
                         }
                     )
                 }
@@ -92,7 +100,9 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation(
     onExportEncrypted: () -> Unit,
     isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit
+    onToggleTheme: () -> Unit,
+    palette: String,
+    onSelectPalette: (String) -> Unit
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Login) }
     var entries by remember { mutableStateOf(emptyList<PasswordEntry>()) }
@@ -237,7 +247,9 @@ fun AppNavigation(
                     }
                 },
                 isDarkTheme = isDarkTheme,
-                onToggleTheme = onToggleTheme
+                onToggleTheme = onToggleTheme,
+                palette = palette,
+                onSelectPalette = onSelectPalette
             )
         }
         is Screen.AddEntry -> {

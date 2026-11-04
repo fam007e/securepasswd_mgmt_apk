@@ -46,6 +46,33 @@ Shared design vocabulary for the desktop (Qt 6 Widgets) and Android
 | `shape.medium` | 8px | buttons, inputs, menus | `small`/`medium` |
 | `shape.large` | 12px | cards (`#statusCard`, `#summaryCard`) | `medium` |
 
+## Palette registry
+
+Three palettes ship on both platforms; each provides a dark and a light
+variant. The user's palette choice is remembered; **dark/light still
+follows the OS** unless explicitly toggled.
+
+| Palette id | Dark | Light |
+|---|---|---|
+| `nord` (default) | Nord | Snow Storm + app-icon accent |
+| `dracula` | Dracula | Dracula Paper |
+| `solarized` | Solarized Dark | Solarized Light |
+
+Desktop: selection lives in the toolbar palette menu, persisted as
+`QSettings("palette")`; token sets in `gui/themes.cpp`, substitution
+template in `gui/theme_template.qss`.
+Android: selection lives in the vault overflow menu ("Color Palette"),
+persisted as the `palette` shared-preferences key; schemes in
+`ui/theme/Theme.kt`.
+
+## Sync port preference
+
+The desktop sync dialog exposes a validated port field (1–65535,
+default 33261, persisted as `QSettings("sync_port")`). The listener
+re-binds while no client is connected; when the port is busy a random
+port is used for that session. The Android app needs no setting — the
+port always arrives inside the `vsync2:` QR payload.
+
 ## Behavior
 
 - **Theme default:** follow the OS color scheme on both platforms. Desktop
