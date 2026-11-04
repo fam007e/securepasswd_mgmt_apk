@@ -2,6 +2,7 @@
 #define DATABASE_H
 
 #include <sqlite3.h>
+#include "sync_protocol.h"
 
 /**
  * @brief Structure representing a password entry.
@@ -14,6 +15,7 @@ typedef struct {
     char *totp_secret;  /**< Base32 TOTP secret. */
     char *recovery_codes; /**< Recovery codes or additional notes. */
     int pwned_count;    /**< Number of times the password was found in breaches. -1 for not checked. */
+    long long updated_at; /**< Unix timestamp of the last local modification (sync causality). */
 } PasswordEntry;
 
 /**
@@ -97,6 +99,25 @@ int database_update_pwned_count(int id, int pwned_count);
  * @return 0 on success, -1 on failure.
  */
 int database_delete(int id);
+
+/**
+ * @brief Retrieves all deletion tombstones recorded in the database.
+ *
+ * Tombstones remember which (service, username) pairs were deleted and when,
+ * so deletions can propagate during 2-way sync.
+ *
+ * @param count A pointer to an integer that will be filled with the number of tombstones.
+ * @return A dynamically allocated array of sync_tombstone_t structs.
+ */
+sync_tombstone_t* database_get_tombstones(int *count);
+
+/**
+ * @brief Records or refreshes a deletion tombstone (used by the sync engine
+ *        when applying a deletion that originated on the peer device).
+ *
+ * @return 0 on success, -1 on failure.
+ */
+int database_record_tombstone(const char *service, const char *username, long long deleted_at);
 
 /**
  * @brief Frees the memory allocated for an array of PasswordEntry structs.

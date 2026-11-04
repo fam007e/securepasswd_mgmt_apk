@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #ifdef HAVE_SQLCIPHER_SUBDIR
   #include <sqlcipher/sqlite3.h>
 #elif defined(HAVE_SQLCIPHER_HEADER)
@@ -43,15 +44,39 @@ static int initialize_schema(void) {
     // Migration for older databases missing pwned_count or recovery_codes
     const char* migrations[] = {
         "ALTER TABLE passwords ADD COLUMN recovery_codes TEXT;",
-        "ALTER TABLE passwords ADD COLUMN pwned_count INTEGER DEFAULT -1;"
+        "ALTER TABLE passwords ADD COLUMN pwned_count INTEGER DEFAULT -1;",
+        "ALTER TABLE passwords ADD COLUMN updated_at INTEGER DEFAULT 0;"
     };
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 3; i++) {
         rc = sqlite3_exec(db, migrations[i], 0, 0, &err_msg);
         if (rc != SQLITE_OK) {
             // Ignore "duplicate column name" errors
             sqlite3_free(err_msg);
         }
+    }
+
+    // Backfill updated_at once when the column is first added so existing
+    // entries participate in sync merges.
+    rc = sqlite3_exec(db,
+        "UPDATE passwords SET updated_at = CAST(strftime('%s', 'now') AS INTEGER) WHERE updated_at = 0;",
+        0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        sqlite3_free(err_msg);
+    }
+
+    // Deletion tombstones: remember which identities were removed and when,
+    // so 2-way sync can propagate deletions instead of resurrecting entries.
+    rc = sqlite3_exec(db,
+        "CREATE TABLE IF NOT EXISTS deleted_entries ("
+        "service TEXT NOT NULL, "
+        "username TEXT NOT NULL, "
+        "deleted_at INTEGER NOT NULL);",
+        0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "SQL error (deleted_entries): %s\n", err_msg);
+        sqlite3_free(err_msg);
+        return -1;
     }
 
     return 0;
@@ -90,6 +115,14 @@ int database_open(const char *db_path, const char *password, const char *salt_pa
 
     // Handle busy locks from concurrent background operations
     sqlite3_busy_timeout(db, 5000);
+
+    // Hardening pragmas (must run after sqlite3_key so the codec is active):
+    //  - secure_delete: zero freed pages inside the encrypted file so deleted
+    //    secrets do not linger; SQLITE_SECURE_DELETE makes this the default,
+    //    this re-asserts it per connection.
+    //  - cipher_memory_security: SQLCipher wipes its heap buffers after use.
+    sqlite3_exec(db, "PRAGMA secure_delete = ON;", NULL, NULL, NULL);
+    sqlite3_exec(db, "PRAGMA cipher_memory_security = ON;", NULL, NULL, NULL);
 
     // Test if the key is correct by trying to access the database
     if (sqlite3_exec(db, "SELECT count(*) FROM sqlite_master;", NULL, NULL, NULL) != SQLITE_OK) {
@@ -132,7 +165,7 @@ PasswordEntry* database_get_all(int *count) {
     PasswordEntry *entries = calloc(*count, sizeof(PasswordEntry));
     if (!entries) return NULL;
 
-    const char *sql = "SELECT id, service, username, password, totp_secret, recovery_codes, pwned_count FROM passwords ORDER BY service COLLATE NOCASE ASC, username COLLATE NOCASE ASC";
+    const char *sql = "SELECT id, service, username, password, totp_secret, recovery_codes, pwned_count, updated_at FROM passwords ORDER BY service COLLATE NOCASE ASC, username COLLATE NOCASE ASC";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         free(entries);
         return NULL;
@@ -153,6 +186,7 @@ PasswordEntry* database_get_all(int *count) {
         entries[i].totp_secret = ts ? strdup((const char *)ts) : strdup("");
         entries[i].recovery_codes = rc ? strdup((const char *)rc) : strdup("");
         entries[i].pwned_count = sqlite3_column_int(stmt, 6);
+        entries[i].updated_at = (long long)sqlite3_column_int64(stmt, 7);
         i++;
     }
 
@@ -217,7 +251,7 @@ PasswordEntry* database_get_entry_by_identity(const char *service, const char *u
     if (!db || !service || !username) return NULL;
 
     sqlite3_stmt *stmt;
-    const char *sql = "SELECT id, service, username, password, totp_secret, recovery_codes, pwned_count FROM passwords WHERE LOWER(service) = LOWER(?) AND LOWER(username) = LOWER(?)";
+    const char *sql = "SELECT id, service, username, password, totp_secret, recovery_codes, pwned_count, updated_at FROM passwords WHERE LOWER(service) = LOWER(?) AND LOWER(username) = LOWER(?)";
 
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         return NULL;
@@ -250,6 +284,7 @@ PasswordEntry* database_get_entry_by_identity(const char *service, const char *u
     entry->totp_secret = ts ? strdup((const char *)ts) : strdup("");
     entry->recovery_codes = rc ? strdup((const char *)rc) : strdup("");
     entry->pwned_count = sqlite3_column_int(stmt, 6);
+    entry->updated_at = (long long)sqlite3_column_int64(stmt, 7);
 
     sqlite3_finalize(stmt);
     return entry;
@@ -259,7 +294,7 @@ PasswordEntry* database_get_by_id(int id) {
     if (!db) return NULL;
 
     sqlite3_stmt *stmt;
-    const char *sql = "SELECT id, service, username, password, totp_secret, recovery_codes, pwned_count FROM passwords WHERE id = ?";
+    const char *sql = "SELECT id, service, username, password, totp_secret, recovery_codes, pwned_count, updated_at FROM passwords WHERE id = ?";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         return NULL;
     }
@@ -290,16 +325,30 @@ PasswordEntry* database_get_by_id(int id) {
     entry->totp_secret = ts ? strdup((const char *)ts) : strdup("");
     entry->recovery_codes = rc ? strdup((const char *)rc) : strdup("");
     entry->pwned_count = sqlite3_column_int(stmt, 6);
+    entry->updated_at = (long long)sqlite3_column_int64(stmt, 7);
 
     sqlite3_finalize(stmt);
     return entry;
 }
 
 int database_add(PasswordEntry *entry) {
-    if (!db) return -1;
+    if (!db || !entry) return -1;
+
+    // Re-adding an identity that was previously deleted on this device
+    // must clear the tombstone so the entry survives the next sync.
+    sqlite3_stmt *tomb_stmt;
+    const char *tomb_sql = "DELETE FROM deleted_entries WHERE LOWER(service) = LOWER(?) AND LOWER(username) = LOWER(?);";
+    if (sqlite3_prepare_v2(db, tomb_sql, -1, &tomb_stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(tomb_stmt, 1, entry->service ? entry->service : "", -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(tomb_stmt, 2, entry->username ? entry->username : "", -1, SQLITE_TRANSIENT);
+        sqlite3_step(tomb_stmt);
+        sqlite3_finalize(tomb_stmt);
+    }
+
+    long long now = entry->updated_at > 0 ? entry->updated_at : (long long)time(NULL);
 
     sqlite3_stmt *stmt;
-    const char *sql = "INSERT INTO passwords (service, username, password, totp_secret, recovery_codes, pwned_count) VALUES (?, ?, ?, ?, ?, ?);";
+    const char *sql = "INSERT INTO passwords (service, username, password, totp_secret, recovery_codes, pwned_count, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?);";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         return -1;
     }
@@ -310,6 +359,7 @@ int database_add(PasswordEntry *entry) {
     sqlite3_bind_text(stmt, 4, entry->totp_secret, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 5, entry->recovery_codes, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt, 6, entry->pwned_count);
+    sqlite3_bind_int64(stmt, 7, (sqlite3_int64)now);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
         sqlite3_finalize(stmt);
@@ -321,10 +371,12 @@ int database_add(PasswordEntry *entry) {
 }
 
 int database_update(PasswordEntry *entry) {
-    if (!db) return -1;
+    if (!db || !entry) return -1;
+
+    long long now = entry->updated_at > 0 ? entry->updated_at : (long long)time(NULL);
 
     sqlite3_stmt *stmt;
-    const char *sql = "UPDATE passwords SET service = ?, username = ?, password = ?, totp_secret = ?, recovery_codes = ?, pwned_count = ? WHERE id = ?;";
+    const char *sql = "UPDATE passwords SET service = ?, username = ?, password = ?, totp_secret = ?, recovery_codes = ?, pwned_count = ?, updated_at = ? WHERE id = ?;";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         return -1;
     }
@@ -335,7 +387,8 @@ int database_update(PasswordEntry *entry) {
     sqlite3_bind_text(stmt, 4, entry->totp_secret, -1, SQLITE_TRANSIENT);
     sqlite3_bind_text(stmt, 5, entry->recovery_codes, -1, SQLITE_TRANSIENT);
     sqlite3_bind_int(stmt, 6, entry->pwned_count);
-    sqlite3_bind_int(stmt, 7, entry->id);
+    sqlite3_bind_int64(stmt, 7, (sqlite3_int64)now);
+    sqlite3_bind_int(stmt, 8, entry->id);
 
     if (sqlite3_step(stmt) != SQLITE_DONE) {
         sqlite3_finalize(stmt);
@@ -370,7 +423,31 @@ int database_update_pwned_count(int id, int pwned_count) {
 int database_delete(int id) {
     if (!db) return -1;
 
+    // Record a deletion tombstone first so the removal can propagate
+    // during 2-way sync instead of looking like a missing entry.
     sqlite3_stmt *stmt;
+    const char *identity_sql = "SELECT service, username FROM passwords WHERE id = ?;";
+    if (sqlite3_prepare_v2(db, identity_sql, -1, &stmt, NULL) != SQLITE_OK) {
+        return -1;
+    }
+    sqlite3_bind_int(stmt, 1, id);
+
+    char service[512] = {0};
+    char username[512] = {0};
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const unsigned char *s = sqlite3_column_text(stmt, 0);
+        const unsigned char *u = sqlite3_column_text(stmt, 1);
+        if (s) snprintf(service, sizeof(service), "%s", (const char *)s);
+        if (u) snprintf(username, sizeof(username), "%s", (const char *)u);
+    }
+    sqlite3_finalize(stmt);
+
+    if (service[0] == '\0') {
+        return -1; // Entry with this ID does not exist
+    }
+
+    database_record_tombstone(service, username, (long long)time(NULL));
+
     const char *sql = "DELETE FROM passwords WHERE id = ?;";
     if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
         return -1;
@@ -385,6 +462,77 @@ int database_delete(int id) {
 
     sqlite3_finalize(stmt);
     return 0;
+}
+
+sync_tombstone_t* database_get_tombstones(int *count) {
+    if (!db || !count) return NULL;
+    *count = 0;
+
+    sqlite3_stmt *stmt;
+    const char *sql = "SELECT service, username, deleted_at FROM deleted_entries";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) {
+        return NULL;
+    }
+
+    int cap = 8, n = 0;
+    sync_tombstone_t *tombstones = calloc((size_t)cap, sizeof(sync_tombstone_t));
+    if (!tombstones) {
+        sqlite3_finalize(stmt);
+        return NULL;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (n == cap) {
+            cap *= 2;
+            sync_tombstone_t *grown = realloc(tombstones, (size_t)cap * sizeof(sync_tombstone_t));
+            if (!grown) {
+                sync_tombstones_free(tombstones, n);
+                sqlite3_finalize(stmt);
+                return NULL;
+            }
+            tombstones = grown;
+        }
+        const unsigned char *s = sqlite3_column_text(stmt, 0);
+        const unsigned char *u = sqlite3_column_text(stmt, 1);
+        tombstones[n].service = strdup(s ? (const char *)s : "");
+        tombstones[n].username = strdup(u ? (const char *)u : "");
+        tombstones[n].deleted_at = (int64_t)sqlite3_column_int64(stmt, 2);
+        if (!tombstones[n].service || !tombstones[n].username) {
+            sync_tombstones_free(tombstones, n + 1);
+            sqlite3_finalize(stmt);
+            return NULL;
+        }
+        n++;
+    }
+
+    sqlite3_finalize(stmt);
+    *count = n;
+    return tombstones;
+}
+
+int database_record_tombstone(const char *service, const char *username, long long deleted_at) {
+    if (!db || !service || !username) return -1;
+
+    sqlite3_stmt *stmt;
+    const char *del_sql = "DELETE FROM deleted_entries WHERE LOWER(service) = LOWER(?) AND LOWER(username) = LOWER(?);";
+    if (sqlite3_prepare_v2(db, del_sql, -1, &stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(stmt, 1, service, -1, SQLITE_TRANSIENT);
+        sqlite3_bind_text(stmt, 2, username, -1, SQLITE_TRANSIENT);
+        sqlite3_step(stmt);
+        sqlite3_finalize(stmt);
+    }
+
+    const char *ins_sql = "INSERT INTO deleted_entries (service, username, deleted_at) VALUES (?, ?, ?);";
+    if (sqlite3_prepare_v2(db, ins_sql, -1, &stmt, NULL) != SQLITE_OK) {
+        return -1;
+    }
+    sqlite3_bind_text(stmt, 1, service, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, username, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 3, (sqlite3_int64)deleted_at);
+
+    int rc = (sqlite3_step(stmt) == SQLITE_DONE) ? 0 : -1;
+    sqlite3_finalize(stmt);
+    return rc;
 }
 
 void free_password_entries(PasswordEntry *entries, int count) {

@@ -69,8 +69,29 @@ Our build system is hardened for total determinism:
 ### Verification Steps:
 1. Note the version and commit hash from F-Droid.
 2. Clone the repository and checkout that commit.
-3. Follow the **Reproducible Builds** instructions in `README.md`.
-4. Compare your local APK hash with the F-Droid APK hash. They should match exactly.
+3. Run the two-build local verification command:
+   ```bash
+   export SOURCE_DATE_EPOCH=1711075200
+
+   # Build 1
+   ./gradlew clean --no-daemon
+   rm -rf app/build .gradle/configuration-cache
+   ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --no-daemon
+   mkdir -p /tmp/build1 && cp app/build/outputs/apk/release/*.apk /tmp/build1/
+   (cd /tmp/build1 && sha256sum *.apk > /tmp/build1.sha256)
+
+   # Build 2
+   ./gradlew clean --no-daemon
+   rm -rf app/build .gradle/configuration-cache
+   ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --no-daemon
+   mkdir -p /tmp/build2 && cp app/build/outputs/apk/release/*.apk /tmp/build2/
+   (cd /tmp/build2 && sha256sum *.apk > /tmp/build2.sha256)
+
+   # Compare
+   diff -u /tmp/build1.sha256 /tmp/build2.sha256
+   ```
+4. Check that both builds produce byte-identical unsigned APKs.
+5. Compare the unsigned APK checksum against F-Droid's build server output.
 
 > [!TIP]
 > Since your app uses the NDK, F-Droid will need to have the matching NDK version installed on their build servers. Our `build.gradle.kts` and `metadata/com.securepasswd.mgmt.yml` specify the exact version required.

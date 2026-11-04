@@ -53,10 +53,10 @@ jobs:
     - name: Build with Gradle
       env:
         SOURCE_DATE_EPOCH: "1711075200"
-      run: ./gradlew :app:assembleDebug -Pandroid.injected.abi.requested=arm64-v8a --stacktrace
+      run: ./gradlew :app:assembleDebug -Pandroid.injected.abi.requested=arm64-v8a --dependency-verification strict --stacktrace
 
     - name: Run Unit Tests
-      run: ./gradlew :app:testDebugUnitTest
+      run: ./gradlew :app:testDebugUnitTest --dependency-verification strict
 
     - name: Upload APK
       uses: https://github.com/actions/upload-artifact@v3

@@ -317,9 +317,8 @@ fun AppNavigation(
             com.securepasswd.mgmt.ui.SyncScreen(
                 onBack = { currentScreen = Screen.Vault },
                 onSyncComplete = {
-                    CoreInterop.databaseClose()
-                    SyncManager.finalizeSyncReplacement(context)
-                    currentScreen = Screen.Login
+                    entries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
+                    currentScreen = Screen.Vault
                 }
             )
         }
@@ -334,15 +333,17 @@ fun AppNavigation(
                             // If ID > 0, it's an existing entry being updated (Conflict resolution: Use Incoming)
                             if (entry.id == 0) {
                                 CoreInterop.databaseAddEntry(
-                                    entry.service, entry.username, 
-                                    entry.password, entry.totpSecret, 
-                                    entry.recoveryCodes, entry.pwnedCount
+                                    entry.service, entry.username,
+                                    entry.password, entry.totpSecret,
+                                    entry.recoveryCodes, entry.pwnedCount,
+                                    entry.updatedAt
                                 )
                             } else {
                                 CoreInterop.databaseUpdateEntry(
                                     entry.id, entry.service, entry.username,
                                     entry.password, entry.totpSecret,
-                                    entry.recoveryCodes, entry.pwnedCount
+                                    entry.recoveryCodes, entry.pwnedCount,
+                                    entry.updatedAt
                                 )
                             }
                         }

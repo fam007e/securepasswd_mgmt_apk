@@ -22,6 +22,26 @@ set(REPRO_FLAGS
 
 add_compile_options(${REPRO_FLAGS})
 
+# Hardening and optimization compile flags
+add_compile_options(
+    -fstack-protector-strong
+    -D_FORTIFY_SOURCE=2
+    -ffunction-sections
+    -fdata-sections
+)
+
+# Hide all symbols by default; JNIEXPORT promotes the JNI entry points
+# back to default visibility, shrinking the dynamic symbol table and the
+# attack surface exposed to dlsym().
+add_compile_options(-fvisibility=hidden -fvisibility-inlines-hidden)
+
+# Stack clash probing: guards against jumps past the stack guard page.
+include(CheckCCompilerFlag)
+check_c_compiler_flag("-fstack-clash-protection" HAVE_STACK_CLASH_PROTECTION)
+if(HAVE_STACK_CLASH_PROTECTION)
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-fstack-clash-protection>)
+endif()
+
 # Linker flags for reproducibility
 add_link_options("-Wl,--build-id=none")
 add_link_options("-Wl,--hash-style=gnu")
@@ -68,7 +88,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
     ${CORE_DIR}/key_derivation.c
     ${CORE_DIR}/password_generator.c
     ${CORE_DIR}/totp.c
-    ${CORE_DIR}/sync_service.c
+    ${CORE_DIR}/sync_protocol.c
     ${CORE_DIR}/pwned_check.c
     ${CORE_DIR}/platform_paths.c
 )
@@ -80,6 +100,12 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     SQLITE_ENABLE_RTREE
     SQLITE_EXTRA_INIT=sqlcipher_extra_init
     SQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown
+    # Zero out deleted pages inside the encrypted DB file so removed
+    # secrets do not linger in freed pages.
+    SQLITE_SECURE_DELETE=1
+    # Disable the dangerous double-quoted-string-as-identifier fallback
+    # (static typing errors surface at prepare time instead).
+    SQLITE_DQS=0
     __ANDROID__
 )
 

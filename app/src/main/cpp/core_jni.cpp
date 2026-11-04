@@ -1,12 +1,12 @@
 #include <jni.h>
-#include <string> 
+#include <string>
 #include <android/log.h>
 #include <sodium.h>
 extern "C" {
 #include "database.h"
 #include "password_generator.h"
 #include "totp.h"
-#include "sync_service.h"
+#include "sync_protocol.h"
 }
 
 extern "C" JNIEXPORT jstring JNICALL
@@ -65,7 +65,7 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseGetAllEntries(
     if (!entryClass) return NULL;
     
     // New signature: (I, String, String, [B, [B, [B, I)
-    jmethodID constructor = env->GetMethodID(entryClass, "<init>", "(ILjava/lang/String;Ljava/lang/String;[B[B[BI)V");
+    jmethodID constructor = env->GetMethodID(entryClass, "<init>", "(ILjava/lang/String;Ljava/lang/String;[B[B[BIJ)V");
     if (!constructor) return NULL;
 
     jobjectArray array = env->NewObjectArray(count, entryClass, NULL);
@@ -93,7 +93,8 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseGetAllEntries(
                                         password,
                                         emptyTotp,
                                         emptyRecovery,
-                                        entries[i].pwned_count);
+                                        entries[i].pwned_count,
+                                        (jlong)entries[i].updated_at);
         env->SetObjectArrayElement(array, i, entryObj);
         env->DeleteLocalRef(service);
         env->DeleteLocalRef(username);
@@ -144,10 +145,12 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseAddEntry(
         jbyteArray password,
         jbyteArray totpSecret,
         jbyteArray recoveryCodes,
-        jint pwnedCount) {
+        jint pwnedCount,
+        jlong updatedAt) {
 
     PasswordEntry entry;
     entry.id = 0;
+    entry.updated_at = (long long)updatedAt;
     entry.service = (char*)env->GetStringUTFChars(service, 0);
     entry.username = (char*)env->GetStringUTFChars(username, 0);
     
@@ -208,10 +211,12 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseUpdateEntry(
         jbyteArray password,
         jbyteArray totpSecret,
         jbyteArray recoveryCodes,
-        jint pwnedCount) {
+        jint pwnedCount,
+        jlong updatedAt) {
 
     PasswordEntry entry;
     entry.id = id;
+    entry.updated_at = (long long)updatedAt;
     entry.service = (char*)env->GetStringUTFChars(service, 0);
     entry.username = (char*)env->GetStringUTFChars(username, 0);
     
@@ -268,7 +273,7 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseGetEntry(
     if (!entry) return NULL;
 
     jclass entryClass = env->FindClass("com/securepasswd/mgmt/PasswordEntry");
-    jmethodID constructor = env->GetMethodID(entryClass, "<init>", "(ILjava/lang/String;Ljava/lang/String;[B[B[BI)V");
+    jmethodID constructor = env->GetMethodID(entryClass, "<init>", "(ILjava/lang/String;Ljava/lang/String;[B[B[BIJ)V");
 
     jstring service = env->NewStringUTF(entry->service ? entry->service : "");
     jstring username = env->NewStringUTF(entry->username ? entry->username : "");
@@ -292,7 +297,8 @@ Java_com_securepasswd_mgmt_CoreInterop_databaseGetEntry(
                                     password,
                                     totpSecret,
                                     recoveryCodes,
-                                    entry->pwned_count);
+                                    entry->pwned_count,
+                                    (jlong)entry->updated_at);
 
     free_password_entries(entry, 1);
     return entryObj;
@@ -341,97 +347,375 @@ Java_com_securepasswd_mgmt_CoreInterop_generatePassword(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
-Java_com_securepasswd_mgmt_CoreInterop_syncEncryptVault(
+Java_com_securepasswd_mgmt_CoreInterop_syncEphemeralKeygen(
         JNIEnv* env,
-        jobject /* this */,
-        jstring source_path,
-        jbyteArray key) {
-    
-    const char *path = env->GetStringUTFChars(source_path, 0);
-    jsize key_len = env->GetArrayLength(key);
-    jbyte* key_bytes = env->GetByteArrayElements(key, 0);
-
-    if (key_len != SYNC_KEY_LEN) {
-        env->ReleaseByteArrayElements(key, key_bytes, 0);
-        env->ReleaseStringUTFChars(source_path, path);
+        jobject /* this */) {
+    uint8_t pub[SYNC_EPHEMERAL_LEN];
+    uint8_t priv[SYNC_EPHEMERAL_LEN];
+    if (sync_ephemeral_keygen(pub, priv) != 0) {
         return NULL;
     }
-
-    // Allocate a buffer large enough for encrypted file (file size + overhead)
-    // We'll get the file size inside the C service. 
-    // For now, let's pre-calculate or handle it better in sync_service.c
-    // Actually, sync_service.c can return the size if we pass a pointer.
-    
-    FILE *f = fopen(path, "rb");
-    if (!f) {
-        env->ReleaseByteArrayElements(key, key_bytes, 0);
-        env->ReleaseStringUTFChars(source_path, path);
-        return NULL;
-    }
-    fseek(f, 0, SEEK_END);
-    size_t fsize = ftell(f);
-    fclose(f);
-
-    size_t output_size = fsize + SYNC_NONCE_LEN + SYNC_TAG_LEN + 1024; // buffer padding
-    unsigned char *output = (unsigned char*)malloc(output_size);
-    if (!output) {
-        env->ReleaseByteArrayElements(key, key_bytes, 0);
-        env->ReleaseStringUTFChars(source_path, path);
-        return NULL;
-    }
-
-    size_t actual_size = 0;
-    if (sync_encrypt_vault(path, output, &actual_size, (unsigned char*)key_bytes) != 0) {
-        free(output);
-        env->ReleaseByteArrayElements(key, key_bytes, 0);
-        env->ReleaseStringUTFChars(source_path, path);
-        return NULL;
-    }
-
-    jbyteArray result = env->NewByteArray(actual_size);
-    env->SetByteArrayRegion(result, 0, actual_size, (jbyte*)output);
-
-    free(output);
-    env->ReleaseByteArrayElements(key, key_bytes, 0);
-    env->ReleaseStringUTFChars(source_path, path);
+    jbyteArray result = env->NewByteArray(SYNC_EPHEMERAL_LEN * 2);
+    jbyte combined[SYNC_EPHEMERAL_LEN * 2];
+    memcpy(combined, pub, SYNC_EPHEMERAL_LEN);
+    memcpy(combined + SYNC_EPHEMERAL_LEN, priv, SYNC_EPHEMERAL_LEN);
+    env->SetByteArrayRegion(result, 0, SYNC_EPHEMERAL_LEN * 2, combined);
+    sodium_memzero(combined, sizeof(combined));
+    sodium_memzero(priv, sizeof(priv));
     return result;
 }
 
-extern "C" JNIEXPORT jint JNICALL
-Java_com_securepasswd_mgmt_CoreInterop_syncDecryptVault(
+extern "C" JNIEXPORT jlong JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncSessionDerive(
         JNIEnv* env,
         jobject /* this */,
-        jbyteArray encrypted_data,
-        jstring destination_path,
-        jbyteArray key) {
-    
-    jsize data_len = env->GetArrayLength(encrypted_data);
-    jbyte* data_bytes = env->GetByteArrayElements(encrypted_data, 0);
-    const char *path = env->GetStringUTFChars(destination_path, 0);
-    jsize key_len = env->GetArrayLength(key);
-    jbyte* key_bytes = env->GetByteArrayElements(key, 0);
-
-    if (key_len != SYNC_KEY_LEN) {
-        env->ReleaseByteArrayElements(key, key_bytes, 0);
-        env->ReleaseStringUTFChars(destination_path, path);
-        env->ReleaseByteArrayElements(encrypted_data, data_bytes, 0);
-        return -1;
+        jint role,
+        jbyteArray psk,
+        jbyteArray clientPub,
+        jbyteArray serverPub,
+        jbyteArray ownPriv) {
+    if (env->GetArrayLength(psk) != SYNC_PSK_LEN ||
+        env->GetArrayLength(clientPub) != SYNC_EPHEMERAL_LEN ||
+        env->GetArrayLength(serverPub) != SYNC_EPHEMERAL_LEN ||
+        env->GetArrayLength(ownPriv) != SYNC_EPHEMERAL_LEN) {
+        return 0;
     }
 
-    int result = sync_decrypt_vault(
-        reinterpret_cast<const unsigned char*>(data_bytes),
-        data_len,
-        path,
-        reinterpret_cast<const unsigned char*>(key_bytes)
-    );
+    jbyte* psk_b = env->GetByteArrayElements(psk, 0);
+    jbyte* cpub_b = env->GetByteArrayElements(clientPub, 0);
+    jbyte* spub_b = env->GetByteArrayElements(serverPub, 0);
+    jbyte* opriv_b = env->GetByteArrayElements(ownPriv, 0);
 
-    // Securely zero the key bytes before releasing
-    if (key_bytes) {
-        sodium_memzero(key_bytes, key_len);
+    sync_session_t* session = (sync_session_t*)malloc(sizeof(sync_session_t));
+    int rc = -1;
+    if (session) {
+        rc = sync_session_derive(
+            (role == 0) ? SYNC_ROLE_SERVER : SYNC_ROLE_CLIENT,
+            reinterpret_cast<const uint8_t*>(psk_b),
+            reinterpret_cast<const uint8_t*>(cpub_b),
+            reinterpret_cast<const uint8_t*>(spub_b),
+            reinterpret_cast<const uint8_t*>(opriv_b),
+            session);
     }
 
-    env->ReleaseByteArrayElements(key, key_bytes, 0);
-    env->ReleaseStringUTFChars(destination_path, path);
-    env->ReleaseByteArrayElements(encrypted_data, data_bytes, 0);
+    env->ReleaseByteArrayElements(psk, psk_b, JNI_ABORT);
+    env->ReleaseByteArrayElements(clientPub, cpub_b, JNI_ABORT);
+    env->ReleaseByteArrayElements(serverPub, spub_b, JNI_ABORT);
+    env->ReleaseByteArrayElements(ownPriv, opriv_b, JNI_ABORT);
+
+    if (rc != 0) {
+        free(session);
+        return 0;
+    }
+    return reinterpret_cast<jlong>(session);
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncFrameEncrypt(
+        JNIEnv* env,
+        jobject /* this */,
+        jlong handle,
+        jint type,
+        jbyteArray payload) {
+    sync_session_t* session = reinterpret_cast<sync_session_t*>(handle);
+    if (!session) return NULL;
+
+    jsize len = env->GetArrayLength(payload);
+    jbyte* bytes = env->GetByteArrayElements(payload, 0);
+
+    size_t out_cap = 5 + (size_t)len + SYNC_TAG_LEN + 16;
+    unsigned char* out = (unsigned char*)malloc(out_cap);
+    size_t out_len = 0;
+    jbyteArray result = NULL;
+    if (out && sync_frame_encrypt(session, (uint8_t)type,
+                                  reinterpret_cast<const uint8_t*>(bytes), (size_t)len,
+                                  out, out_cap, &out_len) == 0) {
+        result = env->NewByteArray((jsize)out_len);
+        env->SetByteArrayRegion(result, 0, (jsize)out_len, (jbyte*)out);
+    }
+    free(out);
+    env->ReleaseByteArrayElements(payload, bytes, JNI_ABORT);
     return result;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncFrameDecrypt(
+        JNIEnv* env,
+        jobject /* this */,
+        jlong handle,
+        jint expectedType,
+        jbyteArray frame) {
+    sync_session_t* session = reinterpret_cast<sync_session_t*>(handle);
+    if (!session) return NULL;
+
+    jsize len = env->GetArrayLength(frame);
+    if (len < 5 + SYNC_TAG_LEN) return NULL;
+    jbyte* bytes = env->GetByteArrayElements(frame, 0);
+
+    size_t payload_cap = (size_t)len; /* >= ciphertext length, always enough */
+    unsigned char* out = (unsigned char*)malloc(payload_cap);
+    size_t out_len = 0;
+    jbyteArray result = NULL;
+    if (out && sync_frame_decrypt(session, (uint8_t)expectedType,
+                                  reinterpret_cast<const uint8_t*>(bytes), (size_t)len,
+                                  out, payload_cap, &out_len) == 0) {
+        result = env->NewByteArray((jsize)out_len);
+        env->SetByteArrayRegion(result, 0, (jsize)out_len, (jbyte*)out);
+        sodium_memzero(out, out_len);
+    }
+    free(out);
+    env->ReleaseByteArrayElements(frame, bytes, JNI_ABORT);
+    return result;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncSessionFree(
+        JNIEnv* env,
+        jobject /* this */,
+        jlong handle) {
+    sync_session_t* session = reinterpret_cast<sync_session_t*>(handle);
+    if (session) {
+        sync_session_zero(session);
+        free(session);
+    }
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncGetTranscriptHash(
+        JNIEnv* env,
+        jobject /* this */,
+        jlong handle) {
+    sync_session_t* session = reinterpret_cast<sync_session_t*>(handle);
+    if (!session) return NULL;
+    jbyteArray result = env->NewByteArray(32);
+    env->SetByteArrayRegion(result, 0, 32, (jbyte*)session->transcript_hash);
+    return result;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncBuildLocalSnapshot(
+        JNIEnv* env,
+        jobject /* this */) {
+    int entry_count = 0;
+    int tomb_count = 0;
+    PasswordEntry* db_entries = database_get_all(&entry_count);
+    sync_tombstone_t* tombs = database_get_tombstones(&tomb_count);
+
+    jbyteArray result = NULL;
+    uint8_t* buf = NULL;
+    size_t buf_len = 0;
+
+    // PasswordEntry and sync_entry_t have different layouts (id, pwned_count);
+    // convert field by field instead of casting.
+    sync_entry_t* entries = (sync_entry_t*)calloc((size_t)(entry_count ? entry_count : 1), sizeof(sync_entry_t));
+    if (entries) {
+        for (int i = 0; i < entry_count; i++) {
+            entries[i].service = strdup(db_entries[i].service ? db_entries[i].service : "");
+            entries[i].username = strdup(db_entries[i].username ? db_entries[i].username : "");
+            entries[i].password = strdup(db_entries[i].password ? db_entries[i].password : "");
+            entries[i].totp_secret = strdup(db_entries[i].totp_secret ? db_entries[i].totp_secret : "");
+            entries[i].recovery_codes = strdup(db_entries[i].recovery_codes ? db_entries[i].recovery_codes : "");
+            entries[i].updated_at = (int64_t)db_entries[i].updated_at;
+        }
+        if (sync_snapshot_serialize(entries, entry_count, tombs, tomb_count, &buf, &buf_len) == 0 && buf) {
+            result = env->NewByteArray((jsize)buf_len);
+            env->SetByteArrayRegion(result, 0, (jsize)buf_len, (jbyte*)buf);
+            memset(buf, 0, buf_len);
+            free(buf);
+        }
+        sync_entries_free(entries, entry_count);
+    }
+
+    if (db_entries) free_password_entries(db_entries, entry_count);
+    if (tombs) sync_tombstones_free(tombs, tomb_count);
+    return result;
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncGetLocalTombstones(
+        JNIEnv* env,
+        jobject /* this */) {
+    int count = 0;
+    sync_tombstone_t* tombs = database_get_tombstones(&count);
+
+    jclass tombClass = env->FindClass("com/securepasswd/mgmt/SyncTombstone");
+    if (!tombClass) {
+        sync_tombstones_free(tombs, count);
+        return NULL;
+    }
+    jmethodID ctor = env->GetMethodID(tombClass, "<init>", "(Ljava/lang/String;Ljava/lang/String;J)V");
+    jobjectArray arr = env->NewObjectArray(count, tombClass, NULL);
+    if (!ctor || !arr) {
+        sync_tombstones_free(tombs, count);
+        return arr;
+    }
+    for (int i = 0; i < count; i++) {
+        jstring s = env->NewStringUTF(tombs[i].service ? tombs[i].service : "");
+        jstring u = env->NewStringUTF(tombs[i].username ? tombs[i].username : "");
+        jobject t = env->NewObject(tombClass, ctor, s, u, (jlong)tombs[i].deleted_at);
+        env->SetObjectArrayElement(arr, i, t);
+        env->DeleteLocalRef(s); env->DeleteLocalRef(u); env->DeleteLocalRef(t);
+    }
+    sync_tombstones_free(tombs, count);
+    return arr;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncPackSnapshot(
+        JNIEnv* env,
+        jobject /* this */,
+        jobjectArray services,
+        jobjectArray usernames,
+        jobjectArray passwords,
+        jobjectArray totpSecrets,
+        jobjectArray recoveryCodes,
+        jlongArray updatedAts,
+        jobjectArray tombServices,
+        jobjectArray tombUsernames,
+        jlongArray tombTimes) {
+    int entry_count = services ? env->GetArrayLength(services) : 0;
+    int tomb_count = tombServices ? env->GetArrayLength(tombServices) : 0;
+
+    sync_entry_t* entries = (sync_entry_t*)calloc((size_t)(entry_count ? entry_count : 1), sizeof(sync_entry_t));
+    sync_tombstone_t* tombs = (sync_tombstone_t*)calloc((size_t)(tomb_count ? tomb_count : 1), sizeof(sync_tombstone_t));
+    if (!entries || !tombs) {
+        free(entries); free(tombs);
+        return NULL;
+    }
+
+    jlong* ats = updatedAts ? env->GetLongArrayElements(updatedAts, 0) : NULL;
+    jlong* tts = tombTimes ? env->GetLongArrayElements(tombTimes, 0) : NULL;
+
+    for (int i = 0; i < entry_count; i++) {
+        jstring s = (jstring)env->GetObjectArrayElement(services, i);
+        jstring u = (jstring)env->GetObjectArrayElement(usernames, i);
+        jbyteArray p = (jbyteArray)env->GetObjectArrayElement(passwords, i);
+        jbyteArray t = (jbyteArray)env->GetObjectArrayElement(totpSecrets, i);
+        jbyteArray r = (jbyteArray)env->GetObjectArrayElement(recoveryCodes, i);
+        const char* sc = s ? env->GetStringUTFChars(s, 0) : "";
+        const char* uc = u ? env->GetStringUTFChars(u, 0) : "";
+        entries[i].service = strdup(sc ? sc : "");
+        entries[i].username = strdup(uc ? uc : "");
+        if (s) env->ReleaseStringUTFChars(s, sc);
+        if (u) env->ReleaseStringUTFChars(u, uc);
+        auto copyBytes = [&](jbyteArray arr) -> char* {
+            if (!arr) return strdup("");
+            jsize n = env->GetArrayLength(arr);
+            jbyte* b = env->GetByteArrayElements(arr, 0);
+            char* c = (char*)malloc((size_t)n + 1);
+            if (c) { memcpy(c, b, (size_t)n); c[n] = '\0'; }
+            env->ReleaseByteArrayElements(arr, b, JNI_ABORT);
+            return c ? c : strdup("");
+        };
+        entries[i].password = copyBytes(p);
+        entries[i].totp_secret = copyBytes(t);
+        entries[i].recovery_codes = copyBytes(r);
+        entries[i].updated_at = ats ? (int64_t)ats[i] : 0;
+        env->DeleteLocalRef(s); env->DeleteLocalRef(u);
+        env->DeleteLocalRef(p); env->DeleteLocalRef(t); env->DeleteLocalRef(r);
+    }
+
+    for (int i = 0; i < tomb_count; i++) {
+        jstring s = (jstring)env->GetObjectArrayElement(tombServices, i);
+        jstring u = (jstring)env->GetObjectArrayElement(tombUsernames, i);
+        const char* sc = s ? env->GetStringUTFChars(s, 0) : "";
+        const char* uc = u ? env->GetStringUTFChars(u, 0) : "";
+        tombs[i].service = strdup(sc ? sc : "");
+        tombs[i].username = strdup(uc ? uc : "");
+        if (s) env->ReleaseStringUTFChars(s, sc);
+        if (u) env->ReleaseStringUTFChars(u, uc);
+        tombs[i].deleted_at = tts ? (int64_t)tts[i] : 0;
+        env->DeleteLocalRef(s); env->DeleteLocalRef(u);
+    }
+
+    if (ats) env->ReleaseLongArrayElements(updatedAts, ats, JNI_ABORT);
+    if (tts) env->ReleaseLongArrayElements(tombTimes, tts, JNI_ABORT);
+
+    uint8_t* buf = NULL;
+    size_t buf_len = 0;
+    jbyteArray result = NULL;
+    if (sync_snapshot_serialize(entries, entry_count, tombs, tomb_count, &buf, &buf_len) == 0 && buf) {
+        result = env->NewByteArray((jsize)buf_len);
+        env->SetByteArrayRegion(result, 0, (jsize)buf_len, (jbyte*)buf);
+        memset(buf, 0, buf_len);
+        free(buf);
+    }
+
+    sync_entries_free(entries, entry_count);
+    sync_tombstones_free(tombs, tomb_count);
+    return result;
+}
+
+extern "C" JNIEXPORT jobject JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncUnpackSnapshot(
+        JNIEnv* env,
+        jobject /* this */,
+        jbyteArray data) {
+    jsize len = env->GetArrayLength(data);
+    jbyte* bytes = env->GetByteArrayElements(data, 0);
+
+    sync_entry_t* entries = NULL;
+    sync_tombstone_t* tombs = NULL;
+    int entry_count = 0, tomb_count = 0;
+    int rc = sync_snapshot_deserialize(reinterpret_cast<const uint8_t*>(bytes), (size_t)len,
+                                       &entries, &entry_count, &tombs, &tomb_count);
+    env->ReleaseByteArrayElements(data, bytes, JNI_ABORT);
+    if (rc != 0) return NULL;
+
+    jclass entryClass = env->FindClass("com/securepasswd/mgmt/PasswordEntry");
+    jclass tombClass = env->FindClass("com/securepasswd/mgmt/SyncTombstone");
+    jclass snapClass = env->FindClass("com/securepasswd/mgmt/SyncSnapshot");
+    if (!entryClass || !tombClass || !snapClass) {
+        sync_entries_free(entries, entry_count);
+        sync_tombstones_free(tombs, tomb_count);
+        return NULL;
+    }
+    jmethodID entryCtor = env->GetMethodID(entryClass, "<init>",
+        "(ILjava/lang/String;Ljava/lang/String;[B[B[BIJ)V");
+    jmethodID tombCtor = env->GetMethodID(tombClass, "<init>",
+        "(Ljava/lang/String;Ljava/lang/String;J)V");
+    jmethodID snapCtor = env->GetMethodID(snapClass, "<init>",
+        "([Lcom/securepasswd/mgmt/PasswordEntry;[Lcom/securepasswd/mgmt/SyncTombstone;)V");
+    if (!entryCtor || !tombCtor || !snapCtor) {
+        sync_entries_free(entries, entry_count);
+        sync_tombstones_free(tombs, tomb_count);
+        return NULL;
+    }
+
+    jobjectArray jentries = env->NewObjectArray(entry_count, entryClass, NULL);
+    for (int i = 0; i < entry_count; i++) {
+        jstring s = env->NewStringUTF(entries[i].service ? entries[i].service : "");
+        jstring u = env->NewStringUTF(entries[i].username ? entries[i].username : "");
+        auto mkBytes = [&](const char* c) -> jbyteArray {
+            size_t n = c ? strlen(c) : 0;
+            jbyteArray arr = env->NewByteArray((jsize)n);
+            if (n) env->SetByteArrayRegion(arr, 0, (jsize)n, (jbyte*)c);
+            return arr;
+        };
+        jbyteArray p = mkBytes(entries[i].password);
+        jbyteArray t = mkBytes(entries[i].totp_secret);
+        jbyteArray r = mkBytes(entries[i].recovery_codes);
+        jobject e = env->NewObject(entryClass, entryCtor, 0, s, u, p, t, r, -1,
+                                   (jlong)entries[i].updated_at);
+        env->SetObjectArrayElement(jentries, i, e);
+        env->DeleteLocalRef(s); env->DeleteLocalRef(u);
+        env->DeleteLocalRef(p); env->DeleteLocalRef(t); env->DeleteLocalRef(r);
+        env->DeleteLocalRef(e);
+    }
+
+    jobjectArray jtombs = env->NewObjectArray(tomb_count, tombClass, NULL);
+    for (int i = 0; i < tomb_count; i++) {
+        jstring s = env->NewStringUTF(tombs[i].service ? tombs[i].service : "");
+        jstring u = env->NewStringUTF(tombs[i].username ? tombs[i].username : "");
+        jobject t = env->NewObject(tombClass, tombCtor, s, u, (jlong)tombs[i].deleted_at);
+        env->SetObjectArrayElement(jtombs, i, t);
+        env->DeleteLocalRef(s); env->DeleteLocalRef(u);
+        env->DeleteLocalRef(t);
+    }
+
+    jobject snapshot = env->NewObject(snapClass, snapCtor, jentries, jtombs);
+
+    sync_entries_free(entries, entry_count);
+    sync_tombstones_free(tombs, tomb_count);
+    return snapshot;
 }
