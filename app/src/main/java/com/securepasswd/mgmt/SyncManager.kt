@@ -43,7 +43,7 @@ object SyncManager {
                 val out: OutputStream = socket.getOutputStream()
                 val inp: InputStream = socket.getInputStream()
 
-                onProgress("Connected. Performing cryptographic handshake...")
+                onProgress("Connected. Authenticating…")
                 // Generate ephemeral X25519 keypair (64 bytes: 32 pub + 32 priv)
                 keypair = CoreInterop.syncEphemeralKeygen()
                     ?: return@withContext SyncResult.Failure("Failed to generate ephemeral keys")
@@ -77,7 +77,7 @@ object SyncManager {
                 }
 
                 // 4. Key confirmation exchange
-                onProgress("Verifying mutual authentication...")
+                onProgress("Authenticated. Exchanging vaults…")
                 // Server sends CONFIRM first
                 val (serverFrameType, serverConfirmFrame) = readFrame(inp)
                 if (serverFrameType != CoreInterop.FRAME_CONFIRM) {
@@ -206,7 +206,7 @@ object SyncManager {
                     out.flush()
                 }
 
-                onProgress("Two-way sync complete!")
+                onProgress("Vault Sync complete!")
                 return@withContext SyncResult.Success(additions, updates, deletions)
             }
         } catch (e: java.net.SocketTimeoutException) {

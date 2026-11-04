@@ -68,7 +68,9 @@ fun SyncScreen(
             isSyncing = false
             when (result) {
                 is SyncResult.Success -> {
-                    val summary = "Sync successful!\nAdded: ${result.additions} | Updated: ${result.updates} | Deleted: ${result.deletions}"
+                    // Cross-platform summary format (DESIGN_TOKENS.md) — identical to desktop.
+                    val summary =
+                        "Vault Sync complete!\nAdded ${result.additions} · Updated ${result.updates} · Deleted ${result.deletions}"
                     syncSuccessSummary = summary
                     statusMessage = summary
                     delay(1800)
@@ -84,7 +86,7 @@ fun SyncScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Secure Two-Way Sync") },
+                title = { Text("Vault Sync") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
