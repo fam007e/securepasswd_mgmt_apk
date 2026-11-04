@@ -1,0 +1,1 @@
+Offline password manager with TOTP, breach checks and secure 2-way sync.

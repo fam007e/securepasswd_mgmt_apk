@@ -5,6 +5,11 @@ AuthorName: Dark Knightz Inc.
 SourceCode: https://codeberg.org/fam007e/securepasswd_mgmt_apk
 IssueTracker: https://codeberg.org/fam007e/securepasswd_mgmt_apk/issues
 
+# NonFreeNet: the optional breach check queries the proprietary
+# Have I Been Pwned API (k-anonymity; only a 5-char SHA-1 prefix is
+# sent). Everything else works fully offline.
+AntiFeatures: NonFreeNet
+
 AutoName: SecurePasswd MGMT
 
 RepoType: git
