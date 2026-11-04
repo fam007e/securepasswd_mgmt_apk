@@ -115,6 +115,12 @@ Done in this repo:
       no API keys, active development (>3 months), vault never backed up
 
 TODO before opening the fdroiddata MR:
+- [x] Stale 2026.04.06 build entry removed (its commit `a9619cc...` does not
+      exist in the repo — found by `fdroid scanner`, would have failed the
+      build server)
+- [x] Metadata canonicalized with `fdroid rewritemeta` (AntiFeatures and
+      AllowedAPKSigningKeys in list form; inline comments do not survive
+      rewritemeta — keep explanations in the MR description)
 - [ ] Tag `v2026.05.30`, then replace `commit: v2026.05.30` in
       `metadata/com.securepasswd.mgmt.yml` with the exact 40-char commit hash
 - [ ] Replace the upscaled 192px `icon.png` with a real 512x512 export of the
@@ -125,6 +131,12 @@ TODO before opening the fdroiddata MR:
       has the old advertising clause
 - [ ] Confirm `gradle: yes` resolves to Gradle 9.3.1 on the buildserver — if
       fdroidserver's own Gradle is older, pin `gradle: 9.3.1` in the metadata
+- [x] Validated locally with fdroidserver 2.4.5: `fdroid lint` green in an
+      fdroiddata checkout (note: lint requires fdroiddata's `config/` dir —
+      running it inside the app repo reports false "invalid" AntiFeatures/
+      Categories), `fdroid rewritemeta` clean, `fdroid checkupdates` processes
+      the app (its serverwebroot error is repo-publish config, not metadata)
+- [ ] `fdroid scanner` re-run after tagging (needs `commit:` to be reachable)
 - [ ] Test with fdroidserver before the MR (Docker):
       `docker run -v $PWD:/repo registry.gitlab.com/fdroid/docker-executable:latest`
       then `fdroid lint`, `fdroid rewritemeta`, `fdroid checkupdates`, `fdroid build`
