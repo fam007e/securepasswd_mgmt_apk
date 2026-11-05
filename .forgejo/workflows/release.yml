@@ -56,7 +56,7 @@ jobs:
         env:
           SOURCE_DATE_EPOCH: "1711075200"
         run: |
-          ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --stacktrace
+          ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --stacktrace --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
           mkdir -p build1
           cp app/build/outputs/apk/release/*.apk build1/
           (cd build1 && sha256sum *.apk > ../build1.sha256)
@@ -70,7 +70,7 @@ jobs:
         env:
           SOURCE_DATE_EPOCH: "1711075200"
         run: |
-          ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --stacktrace
+          ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --stacktrace --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
           mkdir -p build2
           cp app/build/outputs/apk/release/*.apk build2/
           (cd build2 && sha256sum *.apk > ../build2.sha256)
