@@ -11,7 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -29,7 +29,9 @@ fun SyncScreen(
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboardManager.current
+    // New (Compose 1.7+) suspend-based clipboard API; replaces the
+    // deprecated LocalClipboardManager/ClipboardManager.getText().
+    val clipboard = LocalClipboard.current
 
     var statusMessage by remember { mutableStateOf("Scan the QR code shown on your Desktop app to begin secure two-way sync.") }
     var isSyncing by remember { mutableStateOf(false) }
@@ -95,12 +97,15 @@ fun SyncScreen(
                 actions = {
                     if (showScanner) {
                         IconButton(onClick = {
-                            val clip = clipboardManager.getText()?.text?.trim()
-                            if (!clip.isNullOrEmpty() && clip.startsWith("vsync2:")) {
-                                startSyncWithPayload(clip)
-                            } else {
-                                manualInputText = clip ?: ""
-                                showManualInputDialog = true
+                            scope.launch {
+                                val entry = clipboard.getClipEntry()
+                                val clip = entry?.clipData?.getItemAt(0)?.text?.toString()?.trim()
+                                if (!clip.isNullOrEmpty() && clip.startsWith("vsync2:")) {
+                                    startSyncWithPayload(clip)
+                                } else {
+                                    manualInputText = clip ?: ""
+                                    showManualInputDialog = true
+                                }
                             }
                         }) {
                             Icon(Icons.Default.ContentPaste, contentDescription = "Paste or enter sync code")

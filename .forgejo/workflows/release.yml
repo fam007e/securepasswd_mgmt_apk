@@ -11,7 +11,9 @@ concurrency:
 
 jobs:
   release:
-    runs-on: codeberg-medium
+    # Two reproducibility builds + signing cannot fit codeberg-medium's
+    # 10-minute cap; the lazy variant allows long jobs (slower pickup).
+    runs-on: codeberg-medium-lazy
     timeout-minutes: 180
     permissions:
       contents: write

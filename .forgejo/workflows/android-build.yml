@@ -8,12 +8,53 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Runner budget: codeberg-medium allows 10 minutes per job (4 CPU / 8 GB).
+# One combined job (SDK setup + vendored OpenSSL/CMake + Kotlin + tests)
+# exceeds it, so CI is split:
+#   - test:   Kotlin unit tests only — no NDK, no native build (fast)
+#   - native: assembleDebug with the full NDK toolchain (the long pole)
+# Memory flags: the rootless-podman runner kills the container when the
+# Gradle daemon + Kotlin daemon + CMake workers exhaust RAM (manifests as
+# "context deadline exceeded" on the podman socket).
+
 jobs:
-  build:
-
+  test:
     runs-on: codeberg-medium
-    timeout-minutes: 120
+    timeout-minutes: 10
+    steps:
+    - uses: https://github.com/actions/checkout@v4
 
+    - name: set up JDK 21
+      uses: https://github.com/actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: gradle
+
+    # No NDK/cmake here: unit tests are pure JVM and must finish well
+    # inside the 10-minute runner budget.
+    - name: Setup Android SDK
+      uses: https://github.com/android-actions/setup-android@v3
+      with:
+        packages: 'platform-tools build-tools;35.0.0 platforms;android-36'
+
+    - name: Create local.properties
+      run: |
+        SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+        echo "sdk.dir=$SDK_PATH" > local.properties
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Run Unit Tests
+      run: >-
+        ./gradlew :app:testDebugUnitTest --dependency-verification strict
+        --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2g
+        -Pkotlin.compiler.execution.strategy=in-process
+
+  native:
+    runs-on: codeberg-medium
+    timeout-minutes: 10
     steps:
     - uses: https://github.com/actions/checkout@v4
       with:
@@ -31,21 +72,11 @@ jobs:
       with:
         packages: 'platform-tools build-tools;35.0.0 platforms;android-36 ndk;25.1.8937393 cmake;3.22.1'
 
-    - name: Debug Environment
-      run: |
-        echo "ANDROID_HOME: $ANDROID_HOME"
-        echo "ANDROID_SDK_ROOT: $ANDROID_SDK_ROOT"
-        if [ -d "$ANDROID_HOME/cmdline-tools" ]; then
-          find "$ANDROID_HOME/cmdline-tools" -name "sdkmanager" -exec {} --list \; || true
-        fi
-
     - name: Create local.properties
       run: |
         SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
         echo "sdk.dir=$SDK_PATH" > local.properties
         echo "ndk.version=25.1.8937393" >> local.properties
-        echo "--- local.properties ---"
-        cat local.properties
 
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
@@ -53,16 +84,10 @@ jobs:
     - name: Build with Gradle
       env:
         SOURCE_DATE_EPOCH: "1711075200"
-      # Low memory footprint: the rootless-podman runner kills the container
-      # when the Gradle daemon + Kotlin daemon + CMake workers exhaust RAM
-      # (manifests as "context deadline exceeded" on the podman socket).
       run: >-
         ./gradlew :app:assembleDebug -Pandroid.injected.abi.requested=arm64-v8a
-        --dependency-verification strict --stacktrace --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
-
-    - name: Run Unit Tests
-      run: >-
-        ./gradlew :app:testDebugUnitTest --dependency-verification strict --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
+        --dependency-verification strict --stacktrace --no-daemon --max-workers=2
+        -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
 
     - name: Upload APK
       uses: https://github.com/actions/upload-artifact@v3
