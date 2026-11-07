@@ -5,13 +5,14 @@
 #include <openssl/rand.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <time.h>
 
 #ifdef _WIN32
 #define strcasecmp _stricmp
+#else
+#include <strings.h> /* strcasecmp (POSIX) */
 #endif
 
 #ifdef __ANDROID__
