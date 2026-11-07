@@ -493,6 +493,189 @@ Java_com_securepasswd_mgmt_CoreInterop_syncGetTranscriptHash(
 }
 
 extern "C" JNIEXPORT jbyteArray JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncBuildGpgSection(
+        JNIEnv* env,
+        jobject /* this */) {
+    int key_count = 0;
+    GpgKey* keys = database_gpg_get_all(&key_count);
+
+    uint8_t* buf = NULL;
+    size_t buf_len = 0;
+    jbyteArray result = NULL;
+
+    sync_gpg_key_t* section = (sync_gpg_key_t*)calloc(
+        (size_t)(key_count ? key_count : 1), sizeof(sync_gpg_key_t));
+    if (section) {
+        for (int i = 0; i < key_count; i++) {
+            section[i].label = strdup(keys[i].label ? keys[i].label : "");
+            section[i].email = strdup(keys[i].email ? keys[i].email : "");
+            section[i].key_id = strdup(keys[i].key_id ? keys[i].key_id : "");
+            section[i].public_key = strdup(keys[i].public_key ? keys[i].public_key : "");
+            section[i].private_key = strdup(keys[i].private_key ? keys[i].private_key : "");
+            section[i].updated_at = (int64_t)keys[i].updated_at;
+        }
+        if (sync_gpg_serialize(section, key_count, &buf, &buf_len) == 0 && buf) {
+            result = env->NewByteArray((jsize)buf_len);
+            env->SetByteArrayRegion(result, 0, (jsize)buf_len, (jbyte*)buf);
+            memset(buf, 0, buf_len);
+            free(buf);
+        }
+        sync_gpg_keys_free(section, key_count);
+    }
+
+    if (keys) database_gpg_free(keys, key_count);
+    return result;
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_syncParseGpgSection(
+        JNIEnv* env,
+        jobject /* this */,
+        jbyteArray data) {
+    jsize len = env->GetArrayLength(data);
+    jbyte* bytes = env->GetByteArrayElements(data, 0);
+
+    sync_gpg_key_t* keys = NULL;
+    int key_count = 0;
+    int rc = sync_gpg_deserialize(reinterpret_cast<const uint8_t*>(bytes), (size_t)len,
+                                  &keys, &key_count);
+    env->ReleaseByteArrayElements(data, bytes, JNI_ABORT);
+    if (rc != 0) return NULL;
+
+    jclass keyClass = env->FindClass("com/securepasswd/mgmt/GpgKey");
+    if (!keyClass) {
+        sync_gpg_keys_free(keys, key_count);
+        return NULL;
+    }
+    jmethodID ctor = env->GetMethodID(keyClass, "<init>",
+        "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)V");
+    if (!ctor) {
+        sync_gpg_keys_free(keys, key_count);
+        return NULL;
+    }
+
+    jobjectArray arr = env->NewObjectArray(key_count, keyClass, NULL);
+    for (int i = 0; i < key_count; i++) {
+        jstring label = env->NewStringUTF(keys[i].label ? keys[i].label : "");
+        jstring email = env->NewStringUTF(keys[i].email ? keys[i].email : "");
+        jstring keyId = env->NewStringUTF(keys[i].key_id ? keys[i].key_id : "");
+        jstring pub = env->NewStringUTF(keys[i].public_key ? keys[i].public_key : "");
+        jstring priv = env->NewStringUTF(keys[i].private_key ? keys[i].private_key : "");
+        jobject k = env->NewObject(keyClass, ctor, (jint)0, label, email, keyId,
+                                   pub, priv, (jlong)keys[i].updated_at);
+        env->SetObjectArrayElement(arr, i, k);
+        env->DeleteLocalRef(label); env->DeleteLocalRef(email);
+        env->DeleteLocalRef(keyId); env->DeleteLocalRef(pub);
+        env->DeleteLocalRef(priv);  env->DeleteLocalRef(k);
+    }
+
+    sync_gpg_keys_free(keys, key_count);
+    return arr;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_gpgAdd(
+        JNIEnv* env,
+        jobject /* this */,
+        jstring label,
+        jstring email,
+        jstring keyId,
+        jstring publicKey,
+        jstring privateKey) {
+    GpgKey key;
+    memset(&key, 0, sizeof(key));
+    key.label = (char*)env->GetStringUTFChars(label, 0);
+    key.email = email ? (char*)env->GetStringUTFChars(email, 0) : NULL;
+    key.key_id = keyId ? (char*)env->GetStringUTFChars(keyId, 0) : NULL;
+    key.public_key = publicKey ? (char*)env->GetStringUTFChars(publicKey, 0) : NULL;
+    key.private_key = privateKey ? (char*)env->GetStringUTFChars(privateKey, 0) : NULL;
+
+    int rc = database_gpg_add(&key);
+
+    env->ReleaseStringUTFChars(label, key.label);
+    if (email) env->ReleaseStringUTFChars(email, key.email);
+    if (keyId) env->ReleaseStringUTFChars(keyId, key.key_id);
+    if (publicKey) env->ReleaseStringUTFChars(publicKey, key.public_key);
+    if (privateKey) env->ReleaseStringUTFChars(privateKey, key.private_key);
+    return rc;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_gpgUpdate(
+        JNIEnv* env,
+        jobject /* this */,
+        jint id,
+        jstring label,
+        jstring email,
+        jstring keyId,
+        jstring publicKey,
+        jstring privateKey) {
+    GpgKey key;
+    memset(&key, 0, sizeof(key));
+    key.id = id;
+    key.label = (char*)env->GetStringUTFChars(label, 0);
+    key.email = email ? (char*)env->GetStringUTFChars(email, 0) : NULL;
+    key.key_id = keyId ? (char*)env->GetStringUTFChars(keyId, 0) : NULL;
+    key.public_key = publicKey ? (char*)env->GetStringUTFChars(publicKey, 0) : NULL;
+    key.private_key = privateKey ? (char*)env->GetStringUTFChars(privateKey, 0) : NULL;
+
+    int rc = database_gpg_update(&key);
+
+    env->ReleaseStringUTFChars(label, key.label);
+    if (email) env->ReleaseStringUTFChars(email, key.email);
+    if (keyId) env->ReleaseStringUTFChars(keyId, key.key_id);
+    if (publicKey) env->ReleaseStringUTFChars(publicKey, key.public_key);
+    if (privateKey) env->ReleaseStringUTFChars(privateKey, key.private_key);
+    return rc;
+}
+
+extern "C" JNIEXPORT jint JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_gpgDelete(
+        JNIEnv* env,
+        jobject /* this */,
+        jint id) {
+    return database_gpg_delete(id);
+}
+
+extern "C" JNIEXPORT jobjectArray JNICALL
+Java_com_securepasswd_mgmt_CoreInterop_gpgGetAll(
+        JNIEnv* env,
+        jobject /* this */) {
+    int count = 0;
+    GpgKey* keys = database_gpg_get_all(&count);
+
+    jclass keyClass = env->FindClass("com/securepasswd/mgmt/GpgKey");
+    if (!keyClass) {
+        if (keys) database_gpg_free(keys, count);
+        return NULL;
+    }
+    jmethodID ctor = env->GetMethodID(keyClass, "<init>",
+        "(ILjava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;J)V");
+    if (!ctor) {
+        if (keys) database_gpg_free(keys, count);
+        return NULL;
+    }
+
+    jobjectArray arr = env->NewObjectArray(count, keyClass, NULL);
+    for (int i = 0; i < count; i++) {
+        jstring label = env->NewStringUTF(keys[i].label ? keys[i].label : "");
+        jstring email = env->NewStringUTF(keys[i].email ? keys[i].email : "");
+        jstring keyId = env->NewStringUTF(keys[i].key_id ? keys[i].key_id : "");
+        jstring pub = env->NewStringUTF(keys[i].public_key ? keys[i].public_key : "");
+        jstring priv = env->NewStringUTF(keys[i].private_key ? keys[i].private_key : "");
+        jobject k = env->NewObject(keyClass, ctor, (jint)keys[i].id, label, email, keyId,
+                                   pub, priv, (jlong)keys[i].updated_at);
+        env->SetObjectArrayElement(arr, i, k);
+        env->DeleteLocalRef(label); env->DeleteLocalRef(email);
+        env->DeleteLocalRef(keyId); env->DeleteLocalRef(pub);
+        env->DeleteLocalRef(priv);  env->DeleteLocalRef(k);
+    }
+
+    if (keys) database_gpg_free(keys, count);
+    return arr;
+}
+
+extern "C" JNIEXPORT jbyteArray JNICALL
 Java_com_securepasswd_mgmt_CoreInterop_syncBuildLocalSnapshot(
         JNIEnv* env,
         jobject /* this */) {

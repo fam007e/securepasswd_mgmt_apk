@@ -49,6 +49,7 @@ object CoreInterop {
     const val FRAME_SNAPSHOT = 0x03
     const val FRAME_ACK = 0x04
     const val FRAME_ERROR = 0x05
+    const val FRAME_GPG = 0x06
 
     /** @return 64 bytes: 32-byte X25519 public key followed by the private key. */
     external fun syncEphemeralKeygen(): ByteArray?
@@ -103,4 +104,29 @@ object CoreInterop {
 
     /** Parses a snapshot into entries and tombstones; null on format errors. */
     external fun syncUnpackSnapshot(data: ByteArray): SyncSnapshot?
+
+    /** Builds the SPSNAP03 OpenPGP key-store section from the local DB. */
+    external fun syncBuildGpgSection(): ByteArray?
+
+    /** Parses an SPSNAP03 section into [GpgKey] records; null on format errors. */
+    external fun syncParseGpgSection(data: ByteArray): Array<GpgKey>?
+
+    // ── OpenPGP key store CRUD ──
+    external fun gpgAdd(
+        label: String,
+        email: String?,
+        keyId: String?,
+        publicKey: String?,
+        privateKey: String?
+    ): Int
+    external fun gpgUpdate(
+        id: Int,
+        label: String,
+        email: String?,
+        keyId: String?,
+        publicKey: String?,
+        privateKey: String?
+    ): Int
+    external fun gpgDelete(id: Int): Int
+    external fun gpgGetAll(): Array<GpgKey>?
 }

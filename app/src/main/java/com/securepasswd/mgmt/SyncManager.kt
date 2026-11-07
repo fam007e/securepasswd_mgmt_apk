@@ -196,6 +196,72 @@ object SyncManager {
                 // Wipe memory of incoming decrypted entries
                 mergedSnapshot.wipe()
 
+                // 7b. Send the local OpenPGP key store (SPSNAP03 section).
+                onProgress("Sending OpenPGP keys...")
+                val gpgSection = CoreInterop.syncBuildGpgSection()
+                if (gpgSection != null) {
+                    val gpgFrame = CoreInterop.syncFrameEncrypt(
+                        sessionHandle,
+                        CoreInterop.FRAME_GPG,
+                        gpgSection
+                    )
+                    gpgSection.fill(0)
+                    if (gpgFrame != null) {
+                        out.write(gpgFrame)
+                        out.flush()
+                    }
+                }
+
+                // 7c. Receive the merged OpenPGP key store and apply it.
+                onProgress("Receiving merged OpenPGP keys...")
+                val (mergedGpgType, mergedGpgFrame) = readFrame(inp)
+                if (mergedGpgType != CoreInterop.FRAME_GPG) {
+                    return@withContext SyncResult.Failure("Protocol error: expected GPG frame (got 0x${mergedGpgType.toString(16)})")
+                }
+                val mergedGpgBytes = CoreInterop.syncFrameDecrypt(
+                    sessionHandle,
+                    CoreInterop.FRAME_GPG,
+                    mergedGpgFrame
+                ) ?: return@withContext SyncResult.Failure("Failed to decrypt merged OpenPGP keys")
+
+                val mergedKeys = CoreInterop.syncParseGpgSection(mergedGpgBytes)
+                mergedGpgBytes.fill(0)
+                if (mergedKeys != null) {
+                    onProgress("Applying merged OpenPGP keys...")
+                    val localKeys = CoreInterop.gpgGetAll()?.toList() ?: emptyList()
+                    val localByLabel = localKeys.associateBy { it.label.lowercase() }
+                    val mergedLabels = mutableSetOf<String>()
+
+                    for (key in mergedKeys) {
+                        mergedLabels.add(key.label.lowercase())
+                        val existing = localByLabel[key.label.lowercase()]
+                        if (existing == null) {
+                            CoreInterop.gpgAdd(
+                                key.label, key.email, key.keyId,
+                                key.publicKey, key.privateKey
+                            )
+                            additions++
+                        } else if (existing.updatedAt != key.updatedAt ||
+                            existing.publicKey != key.publicKey ||
+                            existing.privateKey != key.privateKey
+                        ) {
+                            CoreInterop.gpgUpdate(
+                                existing.id, key.label, key.email, key.keyId,
+                                key.publicKey, key.privateKey
+                            )
+                            updates++
+                        }
+                    }
+
+                    // Keys absent from the merged store were deleted (or lost
+                    // the merge) on the desktop: apply those removals.
+                    for (local in localKeys) {
+                        if (local.label.lowercase() !in mergedLabels) {
+                            if (CoreInterop.gpgDelete(local.id) == 0) deletions++
+                        }
+                    }
+                }
+
                 // 8. Send ACK frame to desktop to conclude the session
                 onProgress("Finalizing sync...")
                 val ackFrame = CoreInterop.syncFrameEncrypt(

@@ -51,7 +51,8 @@ typedef enum {
     SYNC_FRAME_REQUEST  = 0x02, /* client asks for merged snapshot */
     SYNC_FRAME_SNAPSHOT = 0x03, /* sender's vault snapshot */
     SYNC_FRAME_ACK      = 0x04, /* final acknowledgement */
-    SYNC_FRAME_ERROR    = 0x05  /* abort with UTF-8 message payload */
+    SYNC_FRAME_ERROR    = 0x05, /* abort with UTF-8 message payload */
+    SYNC_FRAME_GPG      = 0x06  /* OpenPGP key store section (SPSNAP03) */
 } sync_frame_type_t;
 
 /* Neutral, platform-independent vault record shared by both ends. */
@@ -188,6 +189,33 @@ int sync_snapshot_deserialize(const uint8_t *data, size_t len,
                               sync_entry_t **entries, int *entry_count,
                               sync_tombstone_t **tombstones, int *tombstone_count);
 
+/* OpenPGP key record stored in the vault and exchanged in snapshots. */
+typedef struct {
+    char *label;       /* user-facing name, also the merge identity */
+    char *email;
+    char *key_id;      /* long key id / fingerprint suffix */
+    char *public_key;  /* ASCII-armored public key (may be empty) */
+    char *private_key; /* ASCII-armored secret key (may be empty) */
+    int64_t updated_at;
+} sync_gpg_key_t;
+
+void sync_gpg_key_init(sync_gpg_key_t *k);
+void sync_gpg_key_wipe(sync_gpg_key_t *k);
+void sync_gpg_keys_wipe(sync_gpg_key_t *keys, int count);
+void sync_gpg_keys_free(sync_gpg_key_t *keys, int count);
+
+/**
+ * Serializes the OpenPGP key store as an independent, self-contained
+ * snapshot section (magic SPSNAP03). Kept separate from the entry snapshot
+ * so entry-only flows are unaffected and the section can be sent in its
+ * own frame if desired.
+ */
+int sync_gpg_serialize(const sync_gpg_key_t *keys, int key_count,
+                       uint8_t **out, size_t *out_len);
+
+int sync_gpg_deserialize(const uint8_t *data, size_t len,
+                         sync_gpg_key_t **keys, int *key_count);
+
 /* ----------------------------- merge ------------------------------ */
 
 typedef enum {
@@ -237,6 +265,32 @@ int sync_merge_vaults(const sync_entry_t *local_entries, int local_count,
                       const sync_tombstone_t *local_tombstones, int local_tomb_count,
                       const sync_tombstone_t *remote_tombstones, int remote_tomb_count,
                       sync_merge_report_t *report);
+
+/* Merge of the OpenPGP key store. Identity is the key label
+ * (case-insensitive); rules identical to sync_merge_vaults, with
+ * deletions expressed as tombstones carrying service == "GPG" and
+ * username == label. */
+typedef struct {
+    sync_merge_action_t action;
+    int is_conflict;
+    sync_gpg_key_t winner; /* populated for APPLY_REMOTE / conflicts */
+    char *label;
+    int64_t tombstone_at;
+} sync_gpg_merge_result_t;
+
+typedef struct {
+    sync_gpg_merge_result_t *results;
+    int result_count;
+    int added, updated, identical, deleted, conflicts;
+} sync_gpg_merge_report_t;
+
+int sync_merge_gpg_keys(const sync_gpg_key_t *local_keys, int local_count,
+                        const sync_gpg_key_t *remote_keys, int remote_count,
+                        const sync_tombstone_t *local_tombstones, int local_tomb_count,
+                        const sync_tombstone_t *remote_tombstones, int remote_tomb_count,
+                        sync_gpg_merge_report_t *report);
+
+void sync_gpg_merge_report_free(sync_gpg_merge_report_t *report);
 
 void sync_merge_report_free(sync_merge_report_t *report);
 

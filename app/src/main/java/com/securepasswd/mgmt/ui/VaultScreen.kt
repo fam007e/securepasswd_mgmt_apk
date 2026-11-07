@@ -50,6 +50,7 @@ fun VaultScreen(
     onToggleTheme: () -> Unit = {},
     palette: String = "nord",
     onSelectPalette: (String) -> Unit = {},
+    onOpenGpgKeys: () -> Unit = {},
     totpViewModel: TotpViewModel = viewModel()
 ) {
     val refreshTrigger by totpViewModel.refreshTrigger.collectAsState()
@@ -288,6 +289,13 @@ fun VaultScreen(
                                 expanded = showMenu,
                                 onDismissRequest = { showMenu = false }
                             ) {
+                                DropdownMenuItem(
+                                    text = { Text("OpenPGP Keys") },
+                                    onClick = {
+                                        showMenu = false
+                                        onOpenGpgKeys()
+                                    }
+                                )
                                 DropdownMenuItem(
                                     text = { Text("Color Palette") },
                                     onClick = {

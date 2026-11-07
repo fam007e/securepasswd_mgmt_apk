@@ -79,6 +79,23 @@ static int initialize_schema(void) {
         return -1;
     }
 
+    // OpenPGP key store (labels are unique merge identities).
+    rc = sqlite3_exec(db,
+        "CREATE TABLE IF NOT EXISTS gpg_keys ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+        "label TEXT NOT NULL, "
+        "email TEXT, "
+        "key_id TEXT, "
+        "public_key TEXT, "
+        "private_key TEXT, "
+        "updated_at INTEGER DEFAULT 0);",
+        0, 0, &err_msg);
+    if (rc != SQLITE_OK) {
+        fprintf(stderr, "SQL error (gpg_keys): %s\n", err_msg);
+        sqlite3_free(err_msg);
+        return -1;
+    }
+
     return 0;
 }
 
@@ -533,6 +550,148 @@ int database_record_tombstone(const char *service, const char *username, long lo
     int rc = (sqlite3_step(stmt) == SQLITE_DONE) ? 0 : -1;
     sqlite3_finalize(stmt);
     return rc;
+}
+
+/* ---------------------- OpenPGP key store CRUD ---------------------- */
+
+int database_gpg_add(const GpgKey *key) {
+    if (!db || !key || !key->label || key->label[0] == '\0') return -1;
+
+    sqlite3_stmt *tomb_stmt;
+    const char *tomb_sql = "DELETE FROM deleted_entries WHERE LOWER(service) = 'gpg' AND LOWER(username) = LOWER(?);";
+    if (sqlite3_prepare_v2(db, tomb_sql, -1, &tomb_stmt, NULL) == SQLITE_OK) {
+        sqlite3_bind_text(tomb_stmt, 1, key->label, -1, SQLITE_TRANSIENT);
+        sqlite3_step(tomb_stmt);
+        sqlite3_finalize(tomb_stmt);
+    }
+
+    long long now = key->updated_at > 0 ? key->updated_at : (long long)time(NULL);
+
+    sqlite3_stmt *stmt;
+    const char *sql = "INSERT INTO gpg_keys (label, email, key_id, public_key, private_key, updated_at) VALUES (?, ?, ?, ?, ?, ?);";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_text(stmt, 1, key->label, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, key->email, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, key->key_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, key->public_key, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, key->private_key, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 6, (sqlite3_int64)now);
+    int rc = (sqlite3_step(stmt) == SQLITE_DONE) ? (int)sqlite3_last_insert_rowid(db) : -1;
+    sqlite3_finalize(stmt);
+    return rc;
+}
+
+int database_gpg_update(const GpgKey *key) {
+    if (!db || !key || key->id <= 0) return -1;
+
+    long long now = key->updated_at > 0 ? key->updated_at : (long long)time(NULL);
+
+    sqlite3_stmt *stmt;
+    const char *sql = "UPDATE gpg_keys SET label = ?, email = ?, key_id = ?, public_key = ?, private_key = ?, updated_at = ? WHERE id = ?;";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_text(stmt, 1, key->label, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 2, key->email, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 3, key->key_id, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 4, key->public_key, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(stmt, 5, key->private_key, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(stmt, 6, (sqlite3_int64)now);
+    sqlite3_bind_int(stmt, 7, key->id);
+    int rc = (sqlite3_step(stmt) == SQLITE_DONE) ? 0 : -1;
+    sqlite3_finalize(stmt);
+    return rc;
+}
+
+int database_gpg_delete(int id) {
+    if (!db || id <= 0) return -1;
+
+    sqlite3_stmt *stmt;
+    const char *sel = "SELECT label FROM gpg_keys WHERE id = ?;";
+    if (sqlite3_prepare_v2(db, sel, -1, &stmt, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_int(stmt, 1, id);
+    char label[512] = {0};
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        const unsigned char *l = sqlite3_column_text(stmt, 0);
+        if (l) snprintf(label, sizeof(label), "%s", (const char *)l);
+    }
+    sqlite3_finalize(stmt);
+
+    if (label[0] == '\0') return -1;
+
+    // Tombstone with service "GPG" so deletions propagate during sync.
+    database_record_tombstone("GPG", label, (long long)time(NULL));
+
+    const char *sql = "DELETE FROM gpg_keys WHERE id = ?;";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_int(stmt, 1, id);
+    int rc = (sqlite3_step(stmt) == SQLITE_DONE) ? 0 : -1;
+    sqlite3_finalize(stmt);
+    return rc;
+}
+
+GpgKey* database_gpg_get_all(int *count) {
+    if (!db || !count) return NULL;
+    *count = 0;
+
+    sqlite3_stmt *stmt;
+    const char *sql = "SELECT id, label, email, key_id, public_key, private_key, updated_at FROM gpg_keys ORDER BY label COLLATE NOCASE ASC;";
+    if (sqlite3_prepare_v2(db, sql, -1, &stmt, NULL) != SQLITE_OK) return NULL;
+
+    int cap = 8, n = 0;
+    GpgKey *keys = calloc((size_t)cap, sizeof(GpgKey));
+    if (!keys) {
+        sqlite3_finalize(stmt);
+        return NULL;
+    }
+
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        if (n == cap) {
+            cap *= 2;
+            GpgKey *grown = realloc(keys, (size_t)cap * sizeof(GpgKey));
+            if (!grown) {
+                database_gpg_free(keys, n);
+                sqlite3_finalize(stmt);
+                return NULL;
+            }
+            keys = grown;
+        }
+        GpgKey *k = &keys[n];
+        k->id = sqlite3_column_int(stmt, 0);
+        const unsigned char *label = sqlite3_column_text(stmt, 1);
+        const unsigned char *email = sqlite3_column_text(stmt, 2);
+        const unsigned char *key_id = sqlite3_column_text(stmt, 3);
+        const unsigned char *pub = sqlite3_column_text(stmt, 4);
+        const unsigned char *priv = sqlite3_column_text(stmt, 5);
+        k->label = strdup(label ? (const char *)label : "");
+        k->email = strdup(email ? (const char *)email : "");
+        k->key_id = strdup(key_id ? (const char *)key_id : "");
+        k->public_key = strdup(pub ? (const char *)pub : "");
+        k->private_key = strdup(priv ? (const char *)priv : "");
+        k->updated_at = (long long)sqlite3_column_int64(stmt, 6);
+        if (!k->label || !k->email || !k->key_id || !k->public_key || !k->private_key) {
+            database_gpg_free(keys, n + 1);
+            sqlite3_finalize(stmt);
+            return NULL;
+        }
+        n++;
+    }
+
+    sqlite3_finalize(stmt);
+    *count = n;
+    return keys;
+}
+
+void database_gpg_free(GpgKey *keys, int count) {
+    if (!keys) return;
+    for (int i = 0; i < count; i++) {
+        sodium_memzero(keys[i].private_key,
+                       keys[i].private_key ? strlen(keys[i].private_key) : 0);
+        free(keys[i].label);
+        free(keys[i].email);
+        free(keys[i].key_id);
+        free(keys[i].public_key);
+        free(keys[i].private_key);
+    }
+    free(keys);
 }
 
 void free_password_entries(PasswordEntry *entries, int count) {

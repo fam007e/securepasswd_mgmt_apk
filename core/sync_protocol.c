@@ -745,3 +745,272 @@ oom:
     sync_merge_report_free(report);
     return -1;
 }
+
+/* ------------------------- OpenPGP key store ------------------------- */
+
+void sync_gpg_key_init(sync_gpg_key_t *k) {
+    if (!k) return;
+    memset(k, 0, sizeof(*k));
+}
+
+void sync_gpg_key_wipe(sync_gpg_key_t *k) {
+    if (!k) return;
+    if (k->label)       { sp_secure_zero(k->label, strlen(k->label)); } // flawfinder: ignore
+    if (k->email)       { sp_secure_zero(k->email, strlen(k->email)); } // flawfinder: ignore
+    if (k->key_id)      { sp_secure_zero(k->key_id, strlen(k->key_id)); } // flawfinder: ignore
+    if (k->public_key)  { sp_secure_zero(k->public_key, strlen(k->public_key)); } // flawfinder: ignore
+    if (k->private_key) { sp_secure_zero(k->private_key, strlen(k->private_key)); } // flawfinder: ignore
+    free(k->label); k->label = NULL;
+    free(k->email); k->email = NULL;
+    free(k->key_id); k->key_id = NULL;
+    free(k->public_key); k->public_key = NULL;
+    free(k->private_key); k->private_key = NULL;
+    k->updated_at = 0;
+}
+
+void sync_gpg_keys_wipe(sync_gpg_key_t *keys, int count) {
+    if (!keys) return;
+    for (int i = 0; i < count; i++) sync_gpg_key_wipe(&keys[i]);
+}
+
+void sync_gpg_keys_free(sync_gpg_key_t *keys, int count) {
+    sync_gpg_keys_wipe(keys, count);
+    free(keys);
+}
+
+/* Key section layout (magic "SPSNAP03"):
+ *   u32 LE key_count, keys...
+ * key: lpstr label, lpstr email, lpstr key_id, lpstr public_key,
+ *      lpstr private_key, i64 LE updated_at
+ */
+int sync_gpg_serialize(const sync_gpg_key_t *keys, int key_count,
+                       uint8_t **out, size_t *out_len) {
+    if (!out || !out_len || key_count < 0) return -1;
+    if (key_count > 0 && !keys) return -1;
+
+    sp_buf_t b = {0};
+    if (sp_buf_put(&b, "SPSNAP03", 8) != 0 ||
+        sp_buf_put_u32(&b, (uint32_t)key_count) != 0) {
+        free(b.buf);
+        return -1;
+    }
+    for (int i = 0; i < key_count; i++) {
+        const sync_gpg_key_t *k = &keys[i];
+        if (sp_buf_put_lpstr(&b, k->label) != 0 ||
+            sp_buf_put_lpstr(&b, k->email) != 0 ||
+            sp_buf_put_lpstr(&b, k->key_id) != 0 ||
+            sp_buf_put_lpstr(&b, k->public_key) != 0 ||
+            sp_buf_put_lpstr(&b, k->private_key) != 0 ||
+            sp_buf_put_i64(&b, k->updated_at) != 0) {
+            sp_secure_zero(b.buf, b.len);
+            free(b.buf);
+            return -1;
+        }
+    }
+    *out = b.buf;
+    *out_len = b.len;
+    return 0;
+}
+
+int sync_gpg_deserialize(const uint8_t *data, size_t len,
+                         sync_gpg_key_t **keys, int *key_count) {
+    if (!data || !keys || !key_count) return -1;
+    *keys = NULL;
+    *key_count = 0;
+
+    sp_reader_t r = { data, len, 0, 0 };
+    const void *magic;
+    if (len < 8 || sp_rd_bytes(&r, &magic, 8) != 0 ||
+        memcmp(magic, "SPSNAP03", 8) != 0) {
+        return -1;
+    }
+
+    uint32_t nk;
+    if (sp_rd_u32(&r, &nk) != 0 || nk > 100000) return -1;
+
+    sync_gpg_key_t *ks = calloc(nk ? nk : 1, sizeof(sync_gpg_key_t));
+    if (!ks) return -1;
+    for (uint32_t i = 0; i < nk; i++) {
+        ks[i].label = sp_rd_lpstr(&r);
+        ks[i].email = ks[i].label ? sp_rd_lpstr(&r) : NULL;
+        ks[i].key_id = ks[i].email ? sp_rd_lpstr(&r) : NULL;
+        ks[i].public_key = ks[i].key_id ? sp_rd_lpstr(&r) : NULL;
+        ks[i].private_key = ks[i].public_key ? sp_rd_lpstr(&r) : NULL;
+        if (!ks[i].private_key || sp_rd_i64(&r, &ks[i].updated_at) != 0) {
+            SPSYNC_LOGE("gpg snapshot: truncated key %u\n", i);
+            sync_gpg_keys_free(ks, (int)nk);
+            return -1;
+        }
+    }
+
+    if (r.off != r.len) {
+        SPSYNC_LOGE("gpg snapshot: %zu trailing bytes\n", r.len - r.off);
+        sync_gpg_keys_free(ks, (int)nk);
+        return -1;
+    }
+
+    *keys = ks;
+    *key_count = (int)nk;
+    return 0;
+}
+
+/* Key-identity helpers. The label is the identity; deletions reuse the
+ * entry tombstone table with service == "GPG". */
+static const sync_tombstone_t *sp_find_gpg_tombstone(const sync_tombstone_t *ts, int count,
+                                                     const char *label) {
+    for (int i = 0; i < count; i++) {
+        if (ts[i].service &&
+            strcasecmp(ts[i].service, "GPG") == 0 &&
+            ts[i].username && strcasecmp(ts[i].username, label) == 0) {
+            return &ts[i];
+        }
+    }
+    return NULL;
+}
+
+static int sp_gpg_content_cmp(const sync_gpg_key_t *a, const sync_gpg_key_t *b) {
+    const char *fa[5] = { a->private_key, a->public_key, a->key_id, a->email, a->label };
+    const char *fb[5] = { b->private_key, b->public_key, b->key_id, b->email, b->label };
+    for (int i = 0; i < 5; i++) {
+        int c = strcmp(fa[i] ? fa[i] : "", fb[i] ? fb[i] : "");
+        if (c != 0) return c;
+    }
+    return 0;
+}
+
+static int sp_gpg_copy(sync_gpg_key_t *dst, const sync_gpg_key_t *src) {
+    dst->label = sp_strdup_or_empty(src->label);
+    dst->email = sp_strdup_or_empty(src->email);
+    dst->key_id = sp_strdup_or_empty(src->key_id);
+    dst->public_key = sp_strdup_or_empty(src->public_key);
+    dst->private_key = sp_strdup_or_empty(src->private_key);
+    dst->updated_at = src->updated_at;
+    return (dst->label && dst->email && dst->key_id &&
+            dst->public_key && dst->private_key) ? 0 : -1;
+}
+
+static int sp_push_gpg_result(sync_gpg_merge_report_t *rep, sync_merge_action_t action,
+                              int is_conflict, const sync_gpg_key_t *winner,
+                              const char *label, int64_t tombstone_at) {
+    sync_gpg_merge_result_t *nr = realloc(rep->results,
+        ((size_t)rep->result_count + 1) * sizeof(sync_gpg_merge_result_t));
+    if (!nr) return -1;
+    rep->results = nr;
+    sync_gpg_merge_result_t *r = &rep->results[rep->result_count];
+    memset(r, 0, sizeof(*r));
+    r->action = action;
+    r->is_conflict = is_conflict;
+    r->tombstone_at = tombstone_at;
+    r->label = sp_strdup_or_empty(label);
+    if (winner && sp_gpg_copy(&r->winner, winner) != 0) {
+        free(r->label);
+        return -1;
+    }
+    rep->result_count++;
+    return 0;
+}
+
+void sync_gpg_merge_report_free(sync_gpg_merge_report_t *report) {
+    if (!report) return;
+    for (int i = 0; i < report->result_count; i++) {
+        free(report->results[i].label);
+        sync_gpg_key_wipe(&report->results[i].winner);
+    }
+    free(report->results);
+    memset(report, 0, sizeof(*report));
+}
+
+static int sp_gpg_data_eq(const sync_gpg_key_t *a, const sync_gpg_key_t *b) {
+    if (a->updated_at != b->updated_at) return 0;
+    const char *fa[4] = { a->email, a->key_id, a->public_key, a->private_key };
+    const char *fb[4] = { b->email, b->key_id, b->public_key, b->private_key };
+    for (int i = 0; i < 4; i++) {
+        if (strcmp(fa[i] ? fa[i] : "", fb[i] ? fb[i] : "") != 0) return 0;
+    }
+    return 1;
+}
+
+int sync_merge_gpg_keys(const sync_gpg_key_t *local_keys, int local_count,
+                        const sync_gpg_key_t *remote_keys, int remote_count,
+                        const sync_tombstone_t *local_tombstones, int local_tomb_count,
+                        const sync_tombstone_t *remote_tombstones, int remote_tomb_count,
+                        sync_gpg_merge_report_t *report) {
+    if (!report) return -1;
+    if ((local_count > 0 && !local_keys) || (remote_count > 0 && !remote_keys)) return -1;
+    if ((local_tomb_count > 0 && !local_tombstones) ||
+        (remote_tomb_count > 0 && !remote_tombstones)) return -1;
+
+    memset(report, 0, sizeof(*report));
+
+    for (int i = 0; i < remote_count; i++) {
+        const sync_gpg_key_t *rk = &remote_keys[i];
+        const sync_gpg_key_t *lk = NULL;
+        for (int j = 0; j < local_count; j++) {
+            if (local_keys[j].label &&
+                strcasecmp(local_keys[j].label, rk->label) == 0) {
+                lk = &local_keys[j];
+                break;
+            }
+        }
+
+        if (!lk) {
+            const sync_tombstone_t *lt = sp_find_gpg_tombstone(local_tombstones, local_tomb_count,
+                                                               rk->label);
+            if (lt && lt->deleted_at >= rk->updated_at) {
+                if (sp_push_gpg_result(report, SYNC_MERGE_IGNORED, 0, NULL,
+                                       rk->label, lt->deleted_at) != 0) goto oom;
+                continue;
+            }
+            if (sp_push_gpg_result(report, SYNC_MERGE_APPLY_REMOTE, 0, rk,
+                                   rk->label, 0) != 0) goto oom;
+            report->added++;
+            continue;
+        }
+
+        if (sp_gpg_data_eq(lk, rk)) {
+            if (sp_push_gpg_result(report, SYNC_MERGE_IDENTICAL, 0, NULL,
+                                   rk->label, 0) != 0) goto oom;
+            report->identical++;
+            continue;
+        }
+
+        int remote_wins;
+        if (rk->updated_at != lk->updated_at) {
+            remote_wins = rk->updated_at > lk->updated_at;
+        } else {
+            remote_wins = sp_gpg_content_cmp(rk, lk) > 0;
+        }
+        const sync_gpg_key_t *winner = remote_wins ? rk : lk;
+        if (sp_push_gpg_result(report,
+                               remote_wins ? SYNC_MERGE_APPLY_REMOTE : SYNC_MERGE_KEEP_LOCAL,
+                               1, winner, rk->label, 0) != 0) goto oom;
+        if (remote_wins) report->updated++;
+        report->conflicts++;
+    }
+
+    for (int i = 0; i < local_count; i++) {
+        const sync_gpg_key_t *lk = &local_keys[i];
+        int found = 0;
+        for (int j = 0; j < remote_count; j++) {
+            if (remote_keys[j].label &&
+                strcasecmp(remote_keys[j].label, lk->label) == 0) {
+                found = 1;
+                break;
+            }
+        }
+        if (found) continue;
+        const sync_tombstone_t *rt = sp_find_gpg_tombstone(remote_tombstones, remote_tomb_count,
+                                                           lk->label);
+        if (rt && rt->deleted_at > lk->updated_at) {
+            if (sp_push_gpg_result(report, SYNC_MERGE_DELETED, 0, NULL,
+                                   lk->label, rt->deleted_at) != 0) goto oom;
+            report->deleted++;
+        }
+    }
+
+    return 0;
+
+oom:
+    sync_gpg_merge_report_free(report);
+    return -1;
+}
