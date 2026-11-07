@@ -57,15 +57,17 @@ set(CORE_DIR ${PROJECT_ROOT}/core)
 set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external)
 
 # Argon2 (Vendored)
+# ARGON2_NO_THREADS: we only ever call argon2id_hash_raw with parallelism=1,
+# so the pthread worker code is compiled out entirely.
 set(argon2_SOURCE_DIR ${EXTERNAL_DIR}/argon2)
 add_library(argon2 STATIC
     ${argon2_SOURCE_DIR}/src/argon2.c
     ${argon2_SOURCE_DIR}/src/core.c
     ${argon2_SOURCE_DIR}/src/blake2/blake2b.c
-    ${argon2_SOURCE_DIR}/src/thread.c
     ${argon2_SOURCE_DIR}/src/encoding.c
     ${argon2_SOURCE_DIR}/src/ref.c
 )
+target_compile_definitions(argon2 PRIVATE ARGON2_NO_THREADS)
 target_include_directories(argon2 PUBLIC ${argon2_SOURCE_DIR}/include)
 
 # OpenSSL (Vendored via openssl-cmake wrapper)
@@ -96,8 +98,8 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     SQLITE_HAS_CODEC
     SQLITE_TEMP_STORE=2
-    SQLITE_ENABLE_FTS5
-    SQLITE_ENABLE_RTREE
+    # FTS5/RTREE are not used by the vault schema; enabling them would
+    # only add binary size and SQL parsing attack surface.
     SQLITE_EXTRA_INIT=sqlcipher_extra_init
     SQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown
     # Zero out deleted pages inside the encrypted DB file so removed
