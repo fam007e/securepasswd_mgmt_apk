@@ -53,8 +53,12 @@ jobs:
         -Pkotlin.compiler.execution.strategy=in-process
 
   native:
-    runs-on: codeberg-medium
-    timeout-minutes: 10
+    # The vendored OpenSSL/SQLCipher native build (~7.5 min) plus NDK
+    # setup (~3.5 min) cannot fit codeberg-medium's 10-minute cap; the
+    # lazy variant trades pickup speed for headroom. The `test` job
+    # above still gives fast PR feedback.
+    runs-on: codeberg-medium-lazy
+    timeout-minutes: 30
     steps:
     - uses: https://github.com/actions/checkout@v4
       with:
