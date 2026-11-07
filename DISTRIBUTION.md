@@ -127,8 +127,8 @@ TODO before opening the fdroiddata MR:
       SVG source
 - [ ] Add 1–8 phone screenshots (PNG) to
       `fastlane/metadata/android/en-US/images/phoneScreenshots/`
-- [ ] Verify the vendored OpenSSL submodule is 3.x (Apache-2.0); OpenSSL 1.x
-      has the old advertising clause
+- [x] Vendored OpenSSL is 3.3.7 (Apache-2.0, bumped from 3.3.2; verified
+      "OpenSSL 3.3.7" in the linked .so)
 - [ ] Confirm `gradle: yes` resolves to Gradle 9.3.1 on the buildserver — if
       fdroidserver's own Gradle is older, pin `gradle: 9.3.1` in the metadata
 - [x] Validated locally with fdroidserver 2.4.5: `fdroid lint` green in an
