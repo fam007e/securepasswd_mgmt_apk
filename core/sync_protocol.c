@@ -378,14 +378,16 @@ static int sp_buf_put(sp_buf_t *b, const void *data, size_t n) {
 }
 
 static int sp_buf_put_u32(sp_buf_t *b, uint32_t v) {
-    uint8_t e[4] = { (uint8_t)v, (uint8_t)(v >> 8), (uint8_t)(v >> 16), (uint8_t)(v >> 24) };
+    const uint8_t e[4] = { (uint8_t)v, (uint8_t)(v >> 8), (uint8_t)(v >> 16), (uint8_t)(v >> 24) };
     return sp_buf_put(b, e, 4);
 }
 
 static int sp_buf_put_i64(sp_buf_t *b, int64_t v) {
     uint64_t u = (uint64_t)v;
-    uint8_t e[8];
-    for (int i = 0; i < 8; i++) e[i] = (uint8_t)(u >> (8 * i));
+    const uint8_t e[8] = {
+        (uint8_t)u, (uint8_t)(u >> 8), (uint8_t)(u >> 16), (uint8_t)(u >> 24),
+        (uint8_t)(u >> 32), (uint8_t)(u >> 40), (uint8_t)(u >> 48), (uint8_t)(u >> 56)
+    };
     return sp_buf_put(b, e, 8);
 }
 
