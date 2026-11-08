@@ -59,7 +59,17 @@ jobs:
         env:
           SOURCE_DATE_EPOCH: "1711075200"
         run: |
-          ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --stacktrace --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
+          # services.gradle.org intermittently 504s on CI egress; the first
+          # invocation downloads the distribution, so retry it explicitly.
+          ok=false
+          for attempt in 1 2 3 4; do
+            if ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --stacktrace --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process; then
+              ok=true; break
+            fi
+            echo "Gradle attempt $attempt failed (likely distribution download); retrying in 45s..."
+            sleep 45
+          done
+          [ "$ok" = true ] || { echo "All gradle attempts failed"; exit 1; }
           mkdir -p build1
           cp app/build/outputs/apk/release/*.apk build1/
           (cd build1 && sha256sum *.apk > ../build1.sha256)
