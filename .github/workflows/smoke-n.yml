@@ -1,0 +1,16 @@
+name: Dispatch Smoke N
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: env test N
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+        run: echo "N ok"
