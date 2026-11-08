@@ -33,6 +33,25 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) {
+        // The cold-start window background is drawn from the manifest theme
+        // before any app code runs (it defaults to dark), but this overlay
+        // corrects the in-process window for users whose stored theme is
+        // light — killing the white flash between splash and first frame.
+        super.attachBaseContext(newBase)
+        val prefs = newBase.getSharedPreferences("secure_passwd_prefs", Context.MODE_PRIVATE)
+        val isLight = when (prefs.getString("ui_mode", null)) {
+            "light" -> true
+            "dark" -> false
+            else -> (newBase.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) !=
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
+        if (isLight) {
+            theme.applyStyle(R.style.LaunchBackground_Light, true)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 

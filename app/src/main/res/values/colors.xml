@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Launch/splash backgrounds. Cold start defaults to dark (the
+         system splash is drawn from the manifest theme before any app
+         code runs, so the stored preference can only correct the
+         in-process window via the LaunchBackground.Light overlay). -->
+    <color name="launch_background_dark">#2E3440</color>
+    <color name="launch_background_light">#ECEFF4</color>
+</resources>
