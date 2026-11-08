@@ -15,9 +15,11 @@ Binaries:
   https://codeberg.org/fam007e/securepasswd_mgmt_apk/releases/download/v%v/securepasswd-universal.apk
 
 Builds:
-  - versionName: 2026.05.30
-    versionCode: 2026053001
-    commit: v2026.05.30
+  - versionName: 2026.11.08
+    versionCode: 2026110801
+    # TODO: replace with the real commit hash after tagging v2026.11.08
+    # (git rev-list -n1 v2026.11.08)
+    commit: v2026.11.08
     subdir: app
     gradle:
       - yes
@@ -32,5 +34,5 @@ AllowedAPKSigningKeys:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 2026.05.30
-CurrentVersionCode: 2026053001
+CurrentVersion: 2026.11.08
+CurrentVersionCode: 2026110801
