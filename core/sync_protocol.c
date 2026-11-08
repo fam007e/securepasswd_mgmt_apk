@@ -19,7 +19,8 @@
 #include <android/log.h>
 #define SPSYNC_LOGE(...) __android_log_print(ANDROID_LOG_ERROR, "SyncProtocol", __VA_ARGS__)
 #else
-#define SPSYNC_LOGE(...) fprintf(stderr, __VA_ARGS__) // flawfinder: ignore
+/* flawfinder: ignore */
+#define SPSYNC_LOGE(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
 /* Secure zeroization that is not optimizable away. */
@@ -38,11 +39,16 @@ void sync_entry_init(sync_entry_t *e) {
 void sync_entry_wipe(sync_entry_t *e) {
     if (!e) return;
     /* All fields are strdup'd elsewhere, hence NUL-terminated by construction. */
-    if (e->service)       { sp_secure_zero(e->service, strlen(e->service)); } // flawfinder: ignore
-    if (e->username)      { sp_secure_zero(e->username, strlen(e->username)); } // flawfinder: ignore
-    if (e->password)      { sp_secure_zero(e->password, strlen(e->password)); } // flawfinder: ignore
-    if (e->totp_secret)   { sp_secure_zero(e->totp_secret, strlen(e->totp_secret)); } // flawfinder: ignore
-    if (e->recovery_codes){ sp_secure_zero(e->recovery_codes, strlen(e->recovery_codes)); } // flawfinder: ignore
+    /* flawfinder: ignore */
+    if (e->service)       { sp_secure_zero(e->service, strlen(e->service)); }
+    /* flawfinder: ignore */
+    if (e->username)      { sp_secure_zero(e->username, strlen(e->username)); }
+    /* flawfinder: ignore */
+    if (e->password)      { sp_secure_zero(e->password, strlen(e->password)); }
+    /* flawfinder: ignore */
+    if (e->totp_secret)   { sp_secure_zero(e->totp_secret, strlen(e->totp_secret)); }
+    /* flawfinder: ignore */
+    if (e->recovery_codes){ sp_secure_zero(e->recovery_codes, strlen(e->recovery_codes)); }
     free(e->service); e->service = NULL;
     free(e->username); e->username = NULL;
     free(e->password); e->password = NULL;
@@ -755,11 +761,16 @@ void sync_gpg_key_init(sync_gpg_key_t *k) {
 
 void sync_gpg_key_wipe(sync_gpg_key_t *k) {
     if (!k) return;
-    if (k->label)       { sp_secure_zero(k->label, strlen(k->label)); } // flawfinder: ignore
-    if (k->email)       { sp_secure_zero(k->email, strlen(k->email)); } // flawfinder: ignore
-    if (k->key_id)      { sp_secure_zero(k->key_id, strlen(k->key_id)); } // flawfinder: ignore
-    if (k->public_key)  { sp_secure_zero(k->public_key, strlen(k->public_key)); } // flawfinder: ignore
-    if (k->private_key) { sp_secure_zero(k->private_key, strlen(k->private_key)); } // flawfinder: ignore
+    /* flawfinder: ignore */
+    if (k->label)       { sp_secure_zero(k->label, strlen(k->label)); }
+    /* flawfinder: ignore */
+    if (k->email)       { sp_secure_zero(k->email, strlen(k->email)); }
+    /* flawfinder: ignore */
+    if (k->key_id)      { sp_secure_zero(k->key_id, strlen(k->key_id)); }
+    /* flawfinder: ignore */
+    if (k->public_key)  { sp_secure_zero(k->public_key, strlen(k->public_key)); }
+    /* flawfinder: ignore */
+    if (k->private_key) { sp_secure_zero(k->private_key, strlen(k->private_key)); }
     free(k->label); k->label = NULL;
     free(k->email); k->email = NULL;
     free(k->key_id); k->key_id = NULL;

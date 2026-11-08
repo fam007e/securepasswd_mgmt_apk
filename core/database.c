@@ -611,6 +611,8 @@ int database_gpg_delete(int id) {
     char label[512] = {0};
     if (sqlite3_step(stmt) == SQLITE_ROW) {
         const unsigned char *l = sqlite3_column_text(stmt, 0);
+        // sqlite3_column_text always returns a NUL-terminated buffer.
+        /* flawfinder: ignore */
         if (l) snprintf(label, sizeof(label), "%s", (const char *)l);
     }
     sqlite3_finalize(stmt);
