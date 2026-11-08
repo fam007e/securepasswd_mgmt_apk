@@ -179,10 +179,14 @@ set(ENV{SOURCE_DATE_EPOCH} "1711075200") # Fixed date for reproducibility
 if(ANDROID)
     list(APPEND OPENSSL_CONFIGURE_OPTIONS "-Wno-macro-redefined")
     # THE PATH MAPPING IS NOW INJECTED INTO THE MAKEFILE LATER TO AVOID STRING EMBEDDING LEAKS
-    
+
     # Enforce no-asm for all Android ABIs to maximize reproducibility across different environments
     # as assembly generation can sometimes be a source of non-determinism.
     list(APPEND OPENSSL_CONFIGURE_OPTIONS "no-asm")
+    # The app links only OpenSSL::Crypto (EVP ChaCha20-Poly1305, X25519,
+    # HKDF, SHA-256, RAND) — skip building libssl entirely (several
+    # hundred fewer translation units on constrained CI containers).
+    list(APPEND OPENSSL_CONFIGURE_OPTIONS "no-ssl")
 endif()
 
 if(CMAKE_ANDROID_ARCH_ABI STREQUAL "armeabi-v7a")

@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.22.1)
 project("securepasswd_mgmt_apk")
 
+# Cap native compile parallelism: ninja would otherwise spawn ~nproc+2
+# clang processes, and the SQLCipher amalgamation + ~2000 OpenSSL
+# translation units under that load exhaust the CI container (seen as
+# podman "context deadline exceeded" on Codeberg). Ninja generator
+# honours job pools; make-based generators use CMAKE_BUILD_PARALLEL_LEVEL.
+set(CMAKE_JOB_POOLS "compile=2")
+set(CMAKE_JOB_POOL_COMPILE compile)
+
 # Suppress noisy macro redefinition warnings globally (e.g., __PIC__)
 add_compile_options(-Wno-macro-redefined)
 
