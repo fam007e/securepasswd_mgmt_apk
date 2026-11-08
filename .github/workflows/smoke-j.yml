@@ -1,0 +1,21 @@
+name: Dispatch Smoke J
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  echo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sign APK (minimal)
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
+          JAVA_TOOL_OPTIONS: "--enable-native-access=ALL-UNNAMED"
+        run: |
+          echo "$SIGNING_KEY_BASE64" | base64 --decode > keystore.jks
