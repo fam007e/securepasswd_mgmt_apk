@@ -15,12 +15,15 @@ A native port of the `SecurePasswd_MGMT` desktop application to Android using Je
 This Android application promises **identical security entropy** to its desktop CLI/GUI counterparts. By dynamically compiling the exact C `core` library via JNI, we bypass high-level platform RNG implementation differences:
 
 * **Argon2id Key Derivation:** Enforces a 128MB memory cost with 3 iterations.
-* **Salt Handling:** Unique salt generation relies exclusively on underlying `/dev/urandom` Linux kernel polling via a `libsodium` shim layer.
+* **Salt Handling & PRNG:** Unique salt generation uses the kernel `getrandom(2)` syscall via a hardened shim, falling back to `/dev/urandom` with abort-on-failure; bounded draws use bias-free rejection sampling.
 * **Memory Safety:** Sensitive data (passwords, TOTP seeds) is handled in `ByteArray` and explicitly zeroed immediately after use. Master passwords never exist as immutable strings in the JVM heap.
 * **Zero-Knowledge Architecture:** No telemetry or tracking.
-* **Advanced Navigation:** Real-time search, global alphabetical sorting, and sticky headers for efficient vault management.
+* **Advanced Navigation:** Real-time search, global alphabetical sorting, sticky headers, and an alphabet fast-scroller for efficient vault management.
+* **Icon Masquerading:** Switch the launcher icon and name (Minimal black & white, Calculator, Notes, Files) so the vault is not advertised on your home screen.
+* **Palettes & Tri-State Theme:** Nord / Dracula / Solarized palettes with a system → light → dark theme cycle and a themed splash screen.
 * **Conflict-Aware Merging:** A Git-style "Merge Review" engine that detects and resolves duplicates/conflicts during imports or syncs, preventing data loss.
-* **Local Network QR Sync:** Direct device-to-device remote encrypted data transfers over TCP using raw socket channels, symmetrically encrypted end-to-end via **ChaCha20-Poly1305** authentication tag verification.
+* **Two-Way Vault Sync:** Bidirectional LAN sync with the desktop app: a 512-bit one-time pairing secret (QR), ephemeral X25519 handshake with transcript-bound HKDF-SHA256 (forward secrecy + mutual authentication), ChaCha20-Poly1305 AEAD frames with replay protection, and a deterministic newer-wins merge with deletion tombstones — both devices converge identically.
+* **OpenPGP Key Storage:** Armored public/secret GPG keys as vault records with a dedicated management screen, included in 2-way sync under the same merge rules.
 * **Secure CSV Support:** Plaintext import and export with built-in protection against Formula Injection (CSV injection).
 * **Password Health Checks:** Uses a privacy-preserving k-anonymity request to the [Have I Been Pwned](https://haveibeenpwned.com/API/v3#PwnedPasswords) API. Only the first 5 characters of a SHA-1 hash are sent. (Note: This is a monetary-free but proprietary network service, which F-Droid tags as `NonFreeNet`).
 * **Modern Material UI:** Featuring intuitive desktop-like themes utilizing the Jetpack Compose framework.
