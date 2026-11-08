@@ -1,4 +1,4 @@
-name: Dispatch Smoke L
+name: Dispatch Smoke O (base64-text secret)
 
 on:
   push:
@@ -13,4 +13,6 @@ jobs:
       - name: env test L
         env:
           SIGNING_KEY_BASE64: ${{ secrets.SIGNING_KEY_BASE64 }}
-        run: echo "L ok"
+        run: |
+          echo "$SIGNING_KEY_BASE64" | base64 --decode > keystore.jks
+          ls -la keystore.jks
