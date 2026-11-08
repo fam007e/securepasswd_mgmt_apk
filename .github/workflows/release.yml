@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:   # manual smoke test: builds + signs, skips publishing (not a tag ref)
 
 concurrency:
   group: release-${{ github.ref }}
