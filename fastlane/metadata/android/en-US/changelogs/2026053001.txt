@@ -1,0 +1,3 @@
+Two-way Vault Sync with 512-bit pairing secret and X25519 handshake.
+F-Droid reproducible-build policy: dependency verification, two-build CI check.
+Hardened CSPRNG shim, network security config, resource shrinking.

@@ -1,5 +1,5 @@
 /*
- *  Copyright 2022-2024 The OpenSSL Project Authors. All Rights Reserved.
+ *  Copyright 2022-2025 The OpenSSL Project Authors. All Rights Reserved.
  *
  *  Licensed under the Apache License 2.0 (the "License").  You may not use
  *  this file except in compliance with the License.  You can obtain a copy
@@ -19,17 +19,17 @@
 
 static const int server_port = 4433;
 
-typedef unsigned char   bool;
-#define true            1
-#define false           0
+typedef unsigned char flag;
+#define true 1
+#define false 0
 
 /*
  * This flag won't be useful until both accept/read (TCP & SSL) methods
  * can be called with a timeout. TBD.
  */
-static volatile bool    server_running = true;
+static volatile flag server_running = true;
 
-int create_socket(bool isServer)
+int create_socket(flag isServer)
 {
     int s;
     int optval = 1;
@@ -48,12 +48,12 @@ int create_socket(bool isServer)
 
         /* Reuse the address; good for quick restarts */
         if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval))
-                < 0) {
+            < 0) {
             perror("setsockopt(SO_REUSEADDR) failed");
             exit(EXIT_FAILURE);
         }
 
-        if (bind(s, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+        if (bind(s, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
             perror("Unable to bind");
             exit(EXIT_FAILURE);
         }
@@ -67,7 +67,7 @@ int create_socket(bool isServer)
     return s;
 }
 
-SSL_CTX* create_context(bool isServer)
+SSL_CTX *create_context(flag isServer)
 {
     const SSL_METHOD *method;
     SSL_CTX *ctx;
@@ -130,7 +130,7 @@ void usage(void)
 
 int main(int argc, char **argv)
 {
-    bool isServer;
+    flag isServer;
     int result;
 
     SSL_CTX *ssl_ctx = NULL;
@@ -158,7 +158,7 @@ int main(int argc, char **argv)
 
     /* Splash */
     printf("\nsslecho : Simple Echo Client/Server : %s : %s\n\n", __DATE__,
-    __TIME__);
+        __TIME__);
 
     /* Need to know if client or server */
     if (argc < 2) {
@@ -196,8 +196,8 @@ int main(int argc, char **argv)
          */
         while (server_running) {
             /* Wait for TCP connection from client */
-            client_skt = accept(server_skt, (struct sockaddr*) &addr,
-                    &addr_len);
+            client_skt = accept(server_skt, (struct sockaddr *)&addr,
+                &addr_len);
             if (client_skt < 0) {
                 perror("Unable to accept");
                 exit(EXIT_FAILURE);
@@ -251,6 +251,11 @@ int main(int argc, char **argv)
                 SSL_shutdown(ssl);
                 SSL_free(ssl);
                 close(client_skt);
+                /*
+                 * Set client_skt to -1 to avoid double close when
+                 * server_running become false before next accept
+                 */
+                client_skt = -1;
             }
         }
         printf("Server exiting...\n");
@@ -270,7 +275,7 @@ int main(int argc, char **argv)
         inet_pton(AF_INET, rem_server_ip, &addr.sin_addr.s_addr);
         addr.sin_port = htons(server_port);
         /* Do TCP connect with server */
-        if (connect(client_skt, (struct sockaddr*) &addr, sizeof(addr)) != 0) {
+        if (connect(client_skt, (struct sockaddr *)&addr, sizeof(addr)) != 0) {
             perror("Unable to TCP connect to server");
             goto exit;
         } else {

@@ -32,3 +32,38 @@ val LightText = Color(0xFF434343)    // Text color
 // ── Semantic aliases used across screens ──
 val AccentCyan = NordFrost1          // Keep old name pointing to Nord equivalent
 val AccentPurple = NordFrost3        // Keep old name pointing to Nord equivalent
+
+// ── Dracula Dark ──
+val DraculaBg = Color(0xFF282A36)
+val DraculaSurface = Color(0xFF343746)
+val DraculaSurfaceVariant = Color(0xFF3B3D4E)
+val DraculaOutline = Color(0xFF44475A)
+val DraculaText = Color(0xFFF8F8F2)
+val DraculaPrimary = Color(0xFFBD93F9)   // purple
+val DraculaPrimaryHover = Color(0xFF9D7BE8)
+val DraculaPrimaryActive = Color(0xFF6272A4)
+
+// ── Dracula Light ("Dracula Paper") ──
+val DraculaLightBg = Color(0xFFF8F8F2)
+val DraculaLightSurface = Color(0xFFFFFFFF)
+val DraculaLightSurfaceVariant = Color(0xFFE6E6E0)
+val DraculaLightOutline = Color(0xFFD8D8D0)
+val DraculaLightText = Color(0xFF3B3D4E)
+val DraculaLightPrimary = Color(0xFF6C4FC4)
+val DraculaLightPrimaryHover = Color(0xFF5A3FB0)
+
+// ── Solarized Dark ──
+val SolarBg = Color(0xFF002B36)
+val SolarSurface = Color(0xFF073642)
+val SolarSurfaceVariant = Color(0xFF0E4450)
+val SolarOutline = Color(0xFF586E75)
+val SolarText = Color(0xFF93A1A1)
+val SolarPrimary = Color(0xFF268BD2)     // blue
+val SolarPrimaryHover = Color(0xFF1E6FA8)
+val SolarPrimaryActive = Color(0xFF6C71C4)
+
+// ── Solarized Light ──
+val SolarLightBg = Color(0xFFFDF6E3)
+val SolarLightSurface = Color(0xFFEEE8D5)
+val SolarLightSurfaceVariant = Color(0xFFE4DDC8)
+val SolarLightText = Color(0xFF586E75)

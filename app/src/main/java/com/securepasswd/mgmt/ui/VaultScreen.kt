@@ -8,8 +8,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -19,11 +23,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.launch
 import com.securepasswd.mgmt.HealthCheckLogic
 import com.securepasswd.mgmt.PasswordEntry
 import com.securepasswd.mgmt.R
@@ -41,6 +48,10 @@ fun VaultScreen(
     onBulkHealthCheck: (List<PasswordEntry>) -> Unit = {},
     isDarkTheme: Boolean = true,
     onToggleTheme: () -> Unit = {},
+    palette: String = "nord",
+    onSelectPalette: (String) -> Unit = {},
+    onOpenGpgKeys: () -> Unit = {},
+    onOpenAppIcon: () -> Unit = {},
     totpViewModel: TotpViewModel = viewModel()
 ) {
     val refreshTrigger by totpViewModel.refreshTrigger.collectAsState()
@@ -48,6 +59,7 @@ fun VaultScreen(
 
     // ── Search & Filter state ────────────────────────────────────────────────
     var searchQuery by remember { mutableStateOf("") }
+    var showPaletteDialog by remember { mutableStateOf(false) }
     var isSearchActive by remember { mutableStateOf(false) }
 
     val filteredAndSortedEntries = remember(entries, searchQuery) {
@@ -59,6 +71,17 @@ fun VaultScreen(
 
     val groupedEntries = remember(filteredAndSortedEntries) {
         filteredAndSortedEntries.groupBy { it.service.take(1).uppercase() }
+    }
+    val listState = rememberLazyListState()
+    // Item offset of each letter's sticky header inside the LazyColumn
+    // (each group contributes 1 sticky header + N entry rows).
+    val letterOffsets = remember(groupedEntries) {
+        var offset = 0
+        groupedEntries.map { (initial, items) ->
+            val at = offset
+            offset += 1 + items.size
+            initial to at
+        }
     }
 
     // ── Multi-select state ──────────────────────────────────────────────────
@@ -268,6 +291,27 @@ fun VaultScreen(
                                 onDismissRequest = { showMenu = false }
                             ) {
                                 DropdownMenuItem(
+                                    text = { Text("OpenPGP Keys") },
+                                    onClick = {
+                                        showMenu = false
+                                        onOpenGpgKeys()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("App Icon") },
+                                    onClick = {
+                                        showMenu = false
+                                        onOpenAppIcon()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("Color Palette") },
+                                    onClick = {
+                                        showMenu = false
+                                        showPaletteDialog = true
+                                    }
+                                )
+                                DropdownMenuItem(
                                     text = { Text("Sync from Desktop") },
                                     onClick = {
                                         showMenu = false
@@ -330,11 +374,16 @@ fun VaultScreen(
         },
         containerColor = colors.background
     ) { innerPadding ->
-        LazyColumn(
+        Box(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .padding(horizontal = 16.dp),
+        ) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(start = 16.dp, end = 36.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             contentPadding = PaddingValues(vertical = 16.dp)
         ) {
@@ -447,7 +496,59 @@ fun VaultScreen(
                 }
             }
         }
+
+        // Fast-scroller: drag/tap the alphabet bar to jump to a service group.
+        AlphabetBar(
+            letters = letterOffsets.map { it.first },
+            offsets = letterOffsets.map { it.second },
+            listState = listState,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 2.dp)
+        )
+        }
     }
+    if (showPaletteDialog) {
+        AlertDialog(
+            onDismissRequest = { showPaletteDialog = false },
+            title = { Text("Color Palette") },
+            text = {
+                Column {
+                    com.securepasswd.mgmt.ui.theme.Palettes.ALL.forEach { id ->
+                        val label = when (id) {
+                            com.securepasswd.mgmt.ui.theme.Palettes.NORD -> "Nord (default)"
+                            com.securepasswd.mgmt.ui.theme.Palettes.DRACULA -> "Dracula"
+                            else -> "Solarized"
+                        }
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(
+                                selected = palette == id,
+                                onClick = {
+                                    onSelectPalette(id)
+                                    showPaletteDialog = false
+                                }
+                            )
+                            Text(label, modifier = Modifier.padding(start = 8.dp))
+                        }
+                    }
+                    Text(
+                        "Dark or light follows your system theme unless toggled.",
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showPaletteDialog = false }) { Text("Done") }
+            }
+        )
+    }
+
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -541,6 +642,97 @@ fun VaultItem(
                     color = healthColor,
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Alphabet fast-scroller: a vertical strip of the letters that actually
+ * exist in the (filtered) vault. Dragging scrubs the list; tapping a
+ * letter jumps straight to its sticky header. While dragging, a bubble
+ * shows the active letter.
+ */
+@Composable
+fun AlphabetBar(
+    letters: List<String>,
+    offsets: List<Int>,
+    listState: LazyListState,
+    modifier: Modifier = Modifier
+) {
+    if (letters.isEmpty()) return
+
+    val scope = rememberCoroutineScope()
+    var activeIndex by remember { mutableStateOf(-1) }
+    var dragging by remember { mutableStateOf(false) }
+
+    fun indexAt(y: Float, height: Float, count: Int): Int =
+        if (height <= 0f) 0 else ((y / height) * count).toInt().coerceIn(0, count - 1)
+
+    fun jumpTo(i: Int) {
+        if (i in offsets.indices) {
+            activeIndex = i
+            scope.launch { listState.scrollToItem(offsets[i]) }
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .width(30.dp)
+            .heightIn(max = 380.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            modifier = Modifier
+                .pointerInput(letters) {
+                    detectVerticalDragGestures(
+                        onDragStart = { pos ->
+                            dragging = true
+                            jumpTo(indexAt(pos.y, size.height.toFloat(), letters.size))
+                        },
+                        onVerticalDrag = { change, _ ->
+                            change.consume()
+                            jumpTo(indexAt(change.position.y, size.height.toFloat(), letters.size))
+                        },
+                        onDragEnd = { dragging = false; activeIndex = -1 },
+                        onDragCancel = { dragging = false; activeIndex = -1 }
+                    )
+                }
+                .pointerInput(letters) {
+                    detectTapGestures { pos ->
+                        jumpTo(indexAt(pos.y, size.height.toFloat(), letters.size))
+                    }
+                },
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            letters.forEachIndexed { i, ch ->
+                val isActive = dragging && i == activeIndex
+                Text(
+                    text = ch,
+                    fontSize = if (isActive) 13.sp else 10.sp,
+                    fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                    color = if (isActive)
+                        MaterialTheme.colorScheme.primary
+                    else
+                        MaterialTheme.colorScheme.onBackground.copy(alpha = 0.55f)
+                )
+            }
+        }
+
+        if (dragging && activeIndex >= 0 && activeIndex < letters.size) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.primary,
+                tonalElevation = 4.dp
+            ) {
+                Text(
+                    text = letters[activeIndex],
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)
                 )
             }
         }

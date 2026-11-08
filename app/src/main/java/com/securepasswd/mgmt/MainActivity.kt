@@ -33,6 +33,25 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 
 class MainActivity : ComponentActivity() {
+    override fun attachBaseContext(newBase: android.content.Context) {
+        // The cold-start window background is drawn from the manifest theme
+        // before any app code runs (it defaults to dark), but this overlay
+        // corrects the in-process window for users whose stored theme is
+        // light — killing the white flash between splash and first frame.
+        super.attachBaseContext(newBase)
+        val prefs = newBase.getSharedPreferences("secure_passwd_prefs", Context.MODE_PRIVATE)
+        val isLight = when (prefs.getString("ui_mode", null)) {
+            "light" -> true
+            "dark" -> false
+            else -> (newBase.resources.configuration.uiMode and
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK) !=
+                android.content.res.Configuration.UI_MODE_NIGHT_YES
+        }
+        if (isLight) {
+            theme.applyStyle(R.style.LaunchBackground_Light, true)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -51,15 +70,29 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val prefs = remember { getSharedPreferences("secure_passwd_prefs", Context.MODE_PRIVATE) }
-            var isDarkTheme by remember {
+            // UI mode tri-state: "system" (default) | "light" | "dark".
+            // Migrates the legacy dark_theme boolean once.
+            var uiMode by remember {
+                val stored = prefs.getString("ui_mode", null)
                 mutableStateOf(
-                    if (prefs.contains("dark_theme")) prefs.getBoolean("dark_theme", true) else null
+                    stored ?: when {
+                        prefs.contains("dark_theme") ->
+                            if (prefs.getBoolean("dark_theme", true)) "dark" else "light"
+                        else -> "system"
+                    }
                 )
             }
             val systemDark = isSystemInDarkTheme()
-            val currentDark = isDarkTheme ?: systemDark
+            val currentDark = when (uiMode) {
+                "light" -> false
+                "dark" -> true
+                else -> systemDark
+            }
+            var palette by remember {
+                mutableStateOf(prefs.getString("palette", "nord") ?: "nord")
+            }
 
-            SecurePasswdTheme(darkTheme = currentDark) {
+            SecurePasswdTheme(darkTheme = currentDark, palette = palette) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
@@ -76,10 +109,23 @@ class MainActivity : ComponentActivity() {
                             } ?: Toast.makeText(this, "Failed to export vault", Toast.LENGTH_SHORT).show()
                         },
                         isDarkTheme = currentDark,
+                        // Cycle: explicit-opposite of what's on screen now
+                        // (so every press visibly changes something), then
+                        // back through the other explicit mode to system.
+                        // E.g. dark-system user: system -> light -> dark -> system.
                         onToggleTheme = {
-                            val newDark = !currentDark
-                            isDarkTheme = newDark
-                            prefs.edit().putBoolean("dark_theme", newDark).apply()
+                            val next = when (uiMode) {
+                                "system" -> if (systemDark) "light" else "dark"
+                                "light" -> "dark"
+                                else -> "system"
+                            }
+                            uiMode = next
+                            prefs.edit().putString("ui_mode", next).apply()
+                        },
+                        palette = palette,
+                        onSelectPalette = { selected ->
+                            palette = selected
+                            prefs.edit().putString("palette", selected).apply()
                         }
                     )
                 }
@@ -92,7 +138,9 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation(
     onExportEncrypted: () -> Unit,
     isDarkTheme: Boolean,
-    onToggleTheme: () -> Unit
+    onToggleTheme: () -> Unit,
+    palette: String,
+    onSelectPalette: (String) -> Unit
 ) {
     var currentScreen by remember { mutableStateOf<Screen>(Screen.Login) }
     var entries by remember { mutableStateOf(emptyList<PasswordEntry>()) }
@@ -237,7 +285,11 @@ fun AppNavigation(
                     }
                 },
                 isDarkTheme = isDarkTheme,
-                onToggleTheme = onToggleTheme
+                onToggleTheme = onToggleTheme,
+                palette = palette,
+                onSelectPalette = onSelectPalette,
+                onOpenGpgKeys = { currentScreen = Screen.GpgKeys },
+                onOpenAppIcon = { currentScreen = Screen.AppIcon }
             )
         }
         is Screen.AddEntry -> {
@@ -317,10 +369,19 @@ fun AppNavigation(
             com.securepasswd.mgmt.ui.SyncScreen(
                 onBack = { currentScreen = Screen.Vault },
                 onSyncComplete = {
-                    CoreInterop.databaseClose()
-                    SyncManager.finalizeSyncReplacement(context)
-                    currentScreen = Screen.Login
+                    entries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
+                    currentScreen = Screen.Vault
                 }
+            )
+        }
+        is Screen.GpgKeys -> {
+            com.securepasswd.mgmt.ui.GpgKeysScreen(
+                onBack = { currentScreen = Screen.Vault }
+            )
+        }
+        is Screen.AppIcon -> {
+            com.securepasswd.mgmt.ui.AppIconScreen(
+                onBack = { currentScreen = Screen.Vault }
             )
         }
         is Screen.MergeReview -> {
@@ -334,15 +395,17 @@ fun AppNavigation(
                             // If ID > 0, it's an existing entry being updated (Conflict resolution: Use Incoming)
                             if (entry.id == 0) {
                                 CoreInterop.databaseAddEntry(
-                                    entry.service, entry.username, 
-                                    entry.password, entry.totpSecret, 
-                                    entry.recoveryCodes, entry.pwnedCount
+                                    entry.service, entry.username,
+                                    entry.password, entry.totpSecret,
+                                    entry.recoveryCodes, entry.pwnedCount,
+                                    entry.updatedAt
                                 )
                             } else {
                                 CoreInterop.databaseUpdateEntry(
                                     entry.id, entry.service, entry.username,
                                     entry.password, entry.totpSecret,
-                                    entry.recoveryCodes, entry.pwnedCount
+                                    entry.recoveryCodes, entry.pwnedCount,
+                                    entry.updatedAt
                                 )
                             }
                         }
@@ -364,6 +427,8 @@ sealed class Screen {
     object Vault : Screen()
     object AddEntry : Screen()
     object Sync : Screen()
+    object GpgKeys : Screen()
+    object AppIcon : Screen()
     data class MergeReview(val report: MergeReport) : Screen()
     data class Details(val entry: PasswordEntry) : Screen()
     data class EditEntry(val entry: PasswordEntry) : Screen()

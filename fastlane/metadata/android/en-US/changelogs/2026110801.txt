@@ -1,0 +1,5 @@
+Two-way Vault Sync: 512-bit pairing secret, X25519 handshake,
+deterministic merge with deletion tombstones. OpenPGP key storage,
+color palettes (Nord/Dracula/Solarized), tri-state theme, alphabet
+fast-scroller, themed splash, app-icon masquerading. F-Droid
+reproducible-build policy: dependency verification, two-build CI check.

@@ -1,6 +1,14 @@
 cmake_minimum_required(VERSION 3.22.1)
 project("securepasswd_mgmt_apk")
 
+# Cap native compile parallelism: ninja would otherwise spawn ~nproc+2
+# clang processes, and the SQLCipher amalgamation + ~2000 OpenSSL
+# translation units under that load exhaust the CI container (seen as
+# podman "context deadline exceeded" on Codeberg). Ninja generator
+# honours job pools; make-based generators use CMAKE_BUILD_PARALLEL_LEVEL.
+set(CMAKE_JOB_POOLS "compile=2")
+set(CMAKE_JOB_POOL_COMPILE compile)
+
 # Suppress noisy macro redefinition warnings globally (e.g., __PIC__)
 add_compile_options(-Wno-macro-redefined)
 
@@ -22,6 +30,26 @@ set(REPRO_FLAGS
 
 add_compile_options(${REPRO_FLAGS})
 
+# Hardening and optimization compile flags
+add_compile_options(
+    -fstack-protector-strong
+    -D_FORTIFY_SOURCE=2
+    -ffunction-sections
+    -fdata-sections
+)
+
+# Hide all symbols by default; JNIEXPORT promotes the JNI entry points
+# back to default visibility, shrinking the dynamic symbol table and the
+# attack surface exposed to dlsym().
+add_compile_options(-fvisibility=hidden -fvisibility-inlines-hidden)
+
+# Stack clash probing: guards against jumps past the stack guard page.
+include(CheckCCompilerFlag)
+check_c_compiler_flag("-fstack-clash-protection" HAVE_STACK_CLASH_PROTECTION)
+if(HAVE_STACK_CLASH_PROTECTION)
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-fstack-clash-protection>)
+endif()
+
 # Linker flags for reproducibility
 add_link_options("-Wl,--build-id=none")
 add_link_options("-Wl,--hash-style=gnu")
@@ -37,15 +65,17 @@ set(CORE_DIR ${PROJECT_ROOT}/core)
 set(EXTERNAL_DIR ${CMAKE_CURRENT_SOURCE_DIR}/external)
 
 # Argon2 (Vendored)
+# ARGON2_NO_THREADS: we only ever call argon2id_hash_raw with parallelism=1,
+# so the pthread worker code is compiled out entirely.
 set(argon2_SOURCE_DIR ${EXTERNAL_DIR}/argon2)
 add_library(argon2 STATIC
     ${argon2_SOURCE_DIR}/src/argon2.c
     ${argon2_SOURCE_DIR}/src/core.c
     ${argon2_SOURCE_DIR}/src/blake2/blake2b.c
-    ${argon2_SOURCE_DIR}/src/thread.c
     ${argon2_SOURCE_DIR}/src/encoding.c
     ${argon2_SOURCE_DIR}/src/ref.c
 )
+target_compile_definitions(argon2 PRIVATE ARGON2_NO_THREADS)
 target_include_directories(argon2 PUBLIC ${argon2_SOURCE_DIR}/include)
 
 # OpenSSL (Vendored via openssl-cmake wrapper)
@@ -68,7 +98,7 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
     ${CORE_DIR}/key_derivation.c
     ${CORE_DIR}/password_generator.c
     ${CORE_DIR}/totp.c
-    ${CORE_DIR}/sync_service.c
+    ${CORE_DIR}/sync_protocol.c
     ${CORE_DIR}/pwned_check.c
     ${CORE_DIR}/platform_paths.c
 )
@@ -76,10 +106,16 @@ add_library(${CMAKE_PROJECT_NAME} SHARED
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     SQLITE_HAS_CODEC
     SQLITE_TEMP_STORE=2
-    SQLITE_ENABLE_FTS5
-    SQLITE_ENABLE_RTREE
+    # FTS5/RTREE are not used by the vault schema; enabling them would
+    # only add binary size and SQL parsing attack surface.
     SQLITE_EXTRA_INIT=sqlcipher_extra_init
     SQLITE_EXTRA_SHUTDOWN=sqlcipher_extra_shutdown
+    # Zero out deleted pages inside the encrypted DB file so removed
+    # secrets do not linger in freed pages.
+    SQLITE_SECURE_DELETE=1
+    # Disable the dangerous double-quoted-string-as-identifier fallback
+    # (static typing errors surface at prepare time instead).
+    SQLITE_DQS=0
     __ANDROID__
 )
 

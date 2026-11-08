@@ -69,3 +69,6 @@ qr_test.py
 
 # ---> Distribution
 
+
+# Mimosa security-hook session state (plugin working files)
+.mimosa/

@@ -11,7 +11,9 @@ concurrency:
 
 jobs:
   release:
-    runs-on: codeberg-medium
+    # Two reproducibility builds + signing cannot fit codeberg-medium's
+    # 10-minute cap; the lazy variant allows long jobs (slower pickup).
+    runs-on: codeberg-medium-lazy
     timeout-minutes: 180
     permissions:
       contents: write
@@ -52,10 +54,34 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Build Release APK
+      - name: Build Release APK (Build 1)
         env:
           SOURCE_DATE_EPOCH: "1711075200"
-        run: ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --stacktrace
+        run: |
+          ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --stacktrace --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
+          mkdir -p build1
+          cp app/build/outputs/apk/release/*.apk build1/
+          (cd build1 && sha256sum *.apk > ../build1.sha256)
+
+      - name: Clean Workspace for Build 2
+        run: |
+          ./gradlew clean
+          rm -rf app/build .gradle/configuration-cache
+
+      - name: Build Release APK (Build 2 - Reproducibility Verification)
+        env:
+          SOURCE_DATE_EPOCH: "1711075200"
+        run: |
+          ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --stacktrace --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
+          mkdir -p build2
+          cp app/build/outputs/apk/release/*.apk build2/
+          (cd build2 && sha256sum *.apk > ../build2.sha256)
+
+      - name: Verify Reproducibility Across Builds
+        run: |
+          echo "Comparing checksums between Build 1 and Build 2..."
+          diff -u build1.sha256 build2.sha256
+          echo "Reproducible build verification successful: both independent builds produced identical APK binaries."
 
       - name: Sign APK
         env:
@@ -96,6 +122,9 @@ jobs:
             $ANDROID_HOME/build-tools/35.0.0/apksigner verify "signed-apks/$new_name"
           done
 
+          (cd signed-apks && sha256sum *.apk > SHA256SUMS)
+          cat signed-apks/SHA256SUMS
+
           rm -f signed-apks/*.idsig
 
       - name: Cleanup keystore
@@ -108,6 +137,7 @@ jobs:
         with:
           files: |
             signed-apks/*.apk
+            signed-apks/SHA256SUMS
           draft: false
           prerelease: false
         env:

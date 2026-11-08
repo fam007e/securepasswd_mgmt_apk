@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Android 12+ system splash: Nord-dark background, launcher adaptive
+         icon (masked like the launcher icon, driven by the high-res
+         drawable-nodpi foreground so it stays crisp). -->
+    <style name="Theme.SecurePasswd_MGMT_APK" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/launch_background_dark</item>
+        <item name="android:windowSplashScreenBackground">@color/launch_background_dark</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
+
+    <style name="LaunchBackground.Light">
+        <item name="android:windowBackground">@color/launch_background_light</item>
+        <item name="android:windowSplashScreenBackground">@color/launch_background_light</item>
+    </style>
+</resources>
