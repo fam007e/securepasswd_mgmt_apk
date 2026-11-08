@@ -51,13 +51,24 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val prefs = remember { getSharedPreferences("secure_passwd_prefs", Context.MODE_PRIVATE) }
-            var isDarkTheme by remember {
+            // UI mode tri-state: "system" (default) | "light" | "dark".
+            // Migrates the legacy dark_theme boolean once.
+            var uiMode by remember {
+                val stored = prefs.getString("ui_mode", null)
                 mutableStateOf(
-                    if (prefs.contains("dark_theme")) prefs.getBoolean("dark_theme", true) else null
+                    stored ?: when {
+                        prefs.contains("dark_theme") ->
+                            if (prefs.getBoolean("dark_theme", true)) "dark" else "light"
+                        else -> "system"
+                    }
                 )
             }
             val systemDark = isSystemInDarkTheme()
-            val currentDark = isDarkTheme ?: systemDark
+            val currentDark = when (uiMode) {
+                "light" -> false
+                "dark" -> true
+                else -> systemDark
+            }
             var palette by remember {
                 mutableStateOf(prefs.getString("palette", "nord") ?: "nord")
             }
@@ -80,9 +91,13 @@ class MainActivity : ComponentActivity() {
                         },
                         isDarkTheme = currentDark,
                         onToggleTheme = {
-                            val newDark = !currentDark
-                            isDarkTheme = newDark
-                            prefs.edit().putBoolean("dark_theme", newDark).apply()
+                            val next = when (uiMode) {
+                                "system" -> "light"
+                                "light" -> "dark"
+                                else -> "system"
+                            }
+                            uiMode = next
+                            prefs.edit().putString("ui_mode", next).apply()
                         },
                         palette = palette,
                         onSelectPalette = { selected ->
