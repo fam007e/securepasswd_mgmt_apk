@@ -90,9 +90,13 @@ class MainActivity : ComponentActivity() {
                             } ?: Toast.makeText(this, "Failed to export vault", Toast.LENGTH_SHORT).show()
                         },
                         isDarkTheme = currentDark,
+                        // Cycle: explicit-opposite of what's on screen now
+                        // (so every press visibly changes something), then
+                        // back through the other explicit mode to system.
+                        // E.g. dark-system user: system -> light -> dark -> system.
                         onToggleTheme = {
                             val next = when (uiMode) {
-                                "system" -> "light"
+                                "system" -> if (systemDark) "light" else "dark"
                                 "light" -> "dark"
                                 else -> "system"
                             }
