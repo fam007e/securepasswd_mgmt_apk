@@ -75,9 +75,13 @@ port always arrives inside the `vsync2:` QR payload.
 
 ## Behavior
 
-- **Theme default:** follow the OS color scheme on both platforms. Desktop
-  stores an explicit choice only after the user toggles (`QSettings` key
-  `theme`); Android defaults to `isSystemInDarkTheme()`.
+- **Theme default:** follow the OS color scheme on both platforms. The
+  desktop toolbar theme button opens a tri-state menu (**Follow System /
+  Light / Dark**, persisted as `QSettings("ui_mode")`); Android's vault
+  theme button **cycles** system → light → dark → system (persisted as the
+  `ui_mode` shared-pref; the legacy `dark_theme` boolean migrates once).
+  The legacy binary "theme" toggle is retired — an override is no longer a
+  one-way trap.
 - **Dark theme = Nord** on both platforms; light theme uses the app-icon
   pink accent on both.
 
