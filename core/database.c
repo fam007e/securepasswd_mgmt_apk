@@ -686,8 +686,12 @@ GpgKey* database_gpg_get_all(int *count) {
 void database_gpg_free(GpgKey *keys, int count) {
     if (!keys) return;
     for (int i = 0; i < count; i++) {
-        sodium_memzero(keys[i].private_key,
-                       keys[i].private_key ? strlen(keys[i].private_key) : 0);
+        // Wipe the secret without strlen(): walk the volatile pointer so
+        // the zeroing cannot be dead-store-eliminated, stopping at NUL.
+        if (keys[i].private_key) {
+            volatile char *p = (volatile char *)keys[i].private_key;
+            while (*p) *p++ = 0;
+        }
         free(keys[i].label);
         free(keys[i].email);
         free(keys[i].key_id);

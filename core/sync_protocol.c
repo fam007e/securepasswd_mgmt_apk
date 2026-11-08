@@ -197,8 +197,9 @@ int sync_session_derive(sync_role_t role,
     uint8_t material[SYNC_SESSION_MATERIAL_LEN];
     size_t material_len = sizeof(material);
     uint8_t info[64];
-    static const char *label = SPSYNC_HKDF_INFO;
-    size_t label_len = strlen(label);
+    static const char label[] = SPSYNC_HKDF_INFO;
+    /* Compile-time length (sizeof includes the NUL terminator). */
+    const size_t label_len = sizeof(label) - 1;
     sp_copy_bytes(info, (const uint8_t *)label, label_len);
     sp_copy_bytes(info + label_len, transcript, sizeof(transcript));
     sp_secure_zero(transcript, sizeof(transcript));

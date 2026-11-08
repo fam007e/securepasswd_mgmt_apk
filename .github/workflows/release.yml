@@ -13,7 +13,7 @@ jobs:
   release:
     # Two reproducibility builds + signing cannot fit codeberg-medium's
     # 10-minute cap; the lazy variant allows long jobs (slower pickup).
-    runs-on: codeberg-medium-lazy
+    runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
       contents: write
