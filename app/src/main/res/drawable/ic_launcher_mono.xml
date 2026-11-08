@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Full-bleed grayscale rendition of the main app icon; the launcher
+         mask provides the shape. -->
+    <background android:drawable="@drawable/ic_launcher_mono_bg" />
+    <foreground android:drawable="@drawable/ic_alias_fg_transparent" />
+</adaptive-icon>

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="file" path="vault.db" />
+    <exclude domain="file" path="vault.db.salt" />
+    <exclude domain="file" path="vault.db-wal" />
+    <exclude domain="file" path="vault.db-shm" />
+    <exclude domain="file" path="vault.db-journal" />
+</full-backup-content>

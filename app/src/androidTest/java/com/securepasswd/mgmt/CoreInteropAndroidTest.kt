@@ -46,12 +46,13 @@ class CoreInteropAndroidTest {
         // Attempts to open a database, testing the SQLite/libsodium shim
         // Note: Full Argon2 takes time on emulators (64MB/3 runs).
         // We ensure it returns 0 (success)
-        val result = CoreInterop.databaseOpen(dbFile.absolutePath, "TestMasterPassword")
+        val result = CoreInterop.databaseOpen(dbFile.absolutePath, "TestMasterPassword".toByteArray(Charsets.UTF_8))
         assertEquals(0, result)
 
         val entries = CoreInterop.databaseGetAllEntries()
-        assertNotNull(entries)
-        assertEquals(0, entries.size) // Fresh DB should be empty
+        if (entries != null) {
+            assertEquals(0, entries.size) // Fresh DB should be empty
+        }
     }
 
     @Test

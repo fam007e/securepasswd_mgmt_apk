@@ -1,0 +1,29 @@
+<b>SecurePasswd MGMT</b> is a fully offline, open-source password manager with built-in two-factor authentication support and encrypted vault synchronization between your desktop and your phone.
+
+<b>Passwords</b>
+• Generate strong passwords with configurable length and character sets (CSPRNG, no modulo bias)
+• Store unlimited entries, each with service, username, password, TOTP secret and recovery codes
+• Live TOTP (2FA) code display with countdown
+• Built-in search across services and usernames
+
+<b>Security</b>
+• Vault encrypted with SQLCipher (AES-256); key derived with Argon2id (128 MiB, t=3)
+• Master password never leaves the device; secrets handled as wipeable byte arrays
+• Screenshot blocking (FLAG_SECURE), no cloud backups of the vault, no cleartext traffic
+• Breach check via the Have I Been Pwned k-anonymity API — only a 5-character SHA-1 prefix is ever sent
+
+<b>Two-Way Vault Sync</b>
+• Pair desktop and phone by scanning a QR code
+• 512-bit one-time pairing secret, ephemeral X25519 handshake (forward secrecy, mutual authentication)
+• ChaCha20-Poly1305 encrypted, replay-protected messages
+• Deterministic merge with deletion tombstones; both devices converge
+
+<b>Import / Export</b>
+• CSV import with conflict review and CSV-formula-injection protection
+• Encrypted vault backup (.spmgmt) for device migration
+
+<b>Freedom</b>
+• 100% open source (MIT), no ads, no trackers, no accounts, works completely offline
+• Built for F-Droid with reproducible builds
+
+Required permissions: camera (QR scanning) and network (breach check + LAN sync only).

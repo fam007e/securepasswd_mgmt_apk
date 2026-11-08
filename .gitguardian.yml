@@ -1,0 +1,10 @@
+# GitGuardian configuration.
+#
+# Vendored upstream dependency sources (OpenSSL, SQLCipher, Argon2) contain
+# their own test vectors and demo constants (e.g. RFC 5054 SRP pairs in
+# ssl/tls_srp.c, sample strings in apps/passwd.c). These are upstream
+# project files, not credentials of this project — exclude them from
+# secret scanning. First-party application code remains fully scanned.
+version: 2
+paths-ignore:
+  - "app/src/main/cpp/external/**"

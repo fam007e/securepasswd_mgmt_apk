@@ -69,8 +69,81 @@ Our build system is hardened for total determinism:
 ### Verification Steps:
 1. Note the version and commit hash from F-Droid.
 2. Clone the repository and checkout that commit.
-3. Follow the **Reproducible Builds** instructions in `README.md`.
-4. Compare your local APK hash with the F-Droid APK hash. They should match exactly.
+3. Run the two-build local verification command:
+   ```bash
+   export SOURCE_DATE_EPOCH=1711075200
+
+   # Build 1
+   ./gradlew clean --no-daemon
+   rm -rf app/build .gradle/configuration-cache
+   ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --no-daemon
+   mkdir -p /tmp/build1 && cp app/build/outputs/apk/release/*.apk /tmp/build1/
+   (cd /tmp/build1 && sha256sum *.apk > /tmp/build1.sha256)
+
+   # Build 2
+   ./gradlew clean --no-daemon
+   rm -rf app/build .gradle/configuration-cache
+   ./gradlew :app:assembleRelease -PenableSplits -Ptarget.abis=arm64-v8a,armeabi-v7a --dependency-verification strict --no-daemon
+   mkdir -p /tmp/build2 && cp app/build/outputs/apk/release/*.apk /tmp/build2/
+   (cd /tmp/build2 && sha256sum *.apk > /tmp/build2.sha256)
+
+   # Compare
+   diff -u /tmp/build1.sha256 /tmp/build2.sha256
+   ```
+4. Check that both builds produce byte-identical unsigned APKs.
+5. Compare the unsigned APK checksum against F-Droid's build server output.
 
 > [!TIP]
 > Since your app uses the NDK, F-Droid will need to have the matching NDK version installed on their build servers. Our `build.gradle.kts` and `metadata/com.securepasswd.mgmt.yml` specify the exact version required.
+
+## F-Droid Submission Checklist (verified against f-droid.org docs)
+
+Done in this repo:
+- [x] `metadata/com.securepasswd.mgmt.yml` (fdroiddata format) with `RepoType: git`,
+      `Repo:`, `Binaries:`, `Builds` block (`versionName`, `versionCode`, `commit`,
+      `subdir: app`, `gradle: yes`, `ndk: 25.1.8937393`, `gradleprops`, `output`),
+      `AllowedAPKSigningKeys`, `AutoUpdateMode: Version`, `UpdateCheckMode: Tags`
+- [x] `AntiFeatures: NonFreeNet` declared (Have I Been Pwned API) — undisclosed
+      anti-features cause rejection; declared ones do not disqualify
+- [x] MIT license, 100% FOSS deps (AndroidX, Compose, CameraX, ZXing, FreeDroidWarn
+      via JitPack — JitPack.io is on F-Droid's trusted-repo list; vendored argon2,
+      OpenSSL, SQLCipher are built from source submodules)
+- [x] Fastlane metadata in-repo: `fastlane/metadata/android/en-US/` with
+      `title.txt`, `short_description.txt` (<80 chars), `full_description.txt`,
+      `images/icon.png`, `changelogs/<versionCode>.txt` (<500 chars)
+- [x] No tracking/ads/GMS, unique applicationId, no executable downloads at runtime,
+      no API keys, active development (>3 months), vault never backed up
+
+TODO before opening the fdroiddata MR:
+- [x] Stale 2026.04.06 build entry removed (its commit `a9619cc...` does not
+      exist in the repo — found by `fdroid scanner`, would have failed the
+      build server)
+- [x] Metadata canonicalized with `fdroid rewritemeta` (AntiFeatures and
+      AllowedAPKSigningKeys in list form; inline comments do not survive
+      rewritemeta — keep explanations in the MR description)
+- [ ] Tag `v2026.05.30`, then replace `commit: v2026.05.30` in
+      `metadata/com.securepasswd.mgmt.yml` with the exact 40-char commit hash
+- [ ] Replace the upscaled 192px `icon.png` with a real 512x512 export of the
+      SVG source
+- [ ] Add 1–8 phone screenshots (PNG) to
+      `fastlane/metadata/android/en-US/images/phoneScreenshots/`
+- [x] Vendored OpenSSL is 3.3.7 (Apache-2.0, bumped from 3.3.2; verified
+      "OpenSSL 3.3.7" in the linked .so)
+- [ ] Confirm `gradle: yes` resolves to Gradle 9.3.1 on the buildserver — if
+      fdroidserver's own Gradle is older, pin `gradle: 9.3.1` in the metadata
+- [x] Validated locally with fdroidserver 2.4.5: `fdroid lint` green in an
+      fdroiddata checkout (note: lint requires fdroiddata's `config/` dir —
+      running it inside the app repo reports false "invalid" AntiFeatures/
+      Categories), `fdroid rewritemeta` clean, `fdroid checkupdates` processes
+      the app (its serverwebroot error is repo-publish config, not metadata)
+- [ ] `fdroid scanner` re-run after tagging (needs `commit:` to be reachable)
+- [ ] Test with fdroidserver before the MR (Docker):
+      `docker run -v $PWD:/repo registry.gitlab.com/fdroid/docker-executable:latest`
+      then `fdroid lint`, `fdroid rewritemeta`, `fdroid checkupdates`, `fdroid build`
+- [ ] Fork gitlab.com/fdroid/fdroiddata, add `metadata/com.securepasswd.mgmt.yml`,
+      commit as "New App: com.securepasswd.mgmt", push, open MR;
+      expect build+publish ~24-48h after merge
+
+Reproducibility (Verified Builds): sign releases with `apksigner` (CI does),
+publish the CI-built APKs via the `Binaries:` URL, keep `AllowedAPKSigningKeys`
+pinned — F-Droid will then verify and publish the developer-signed APKs.

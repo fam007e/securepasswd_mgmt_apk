@@ -4,117 +4,331 @@ import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.io.EOFException
 import java.io.InputStream
+import java.io.OutputStream
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.Arrays
+
+sealed class SyncResult {
+    data class Success(val additions: Int, val updates: Int, val deletions: Int) : SyncResult()
+    data class Failure(val message: String) : SyncResult()
+}
 
 object SyncManager {
     private const val TAG = "SyncManager"
+    private const val CONNECT_TIMEOUT_MS = 10000
+    private const val SOCKET_TIMEOUT_MS = 20000
+    private const val PROTOCOL_VERSION: Byte = 0x02
 
     suspend fun performSync(
         context: Context,
         ip: String,
         port: Int,
-        keyHex: String,
+        psk: ByteArray,
         onProgress: (String) -> Unit
-    ): Boolean = withContext(Dispatchers.IO) {
-        val key = hexToBytes(keyHex)
+    ): SyncResult = withContext(Dispatchers.IO) {
+        var sessionHandle: Long = 0L
+        var clientPriv: ByteArray? = null
+        var keypair: ByteArray? = null
+
         try {
             onProgress("Connecting to $ip:$port...")
-            Log.d(TAG, "Attempting connection to $ip:$port")
-            
+            Log.d(TAG, "Connecting to $ip:$port")
+
             Socket().use { socket ->
-                socket.soTimeout = 10000 // 10s read timeout
-                socket.connect(InetSocketAddress(ip, port), 10000) // 10s connect timeout
+                socket.soTimeout = SOCKET_TIMEOUT_MS
+                socket.connect(InetSocketAddress(ip, port), CONNECT_TIMEOUT_MS)
+                val out: OutputStream = socket.getOutputStream()
+                val inp: InputStream = socket.getInputStream()
 
-                onProgress("Connected! Receiving data...")
-                val inputStream: InputStream = socket.getInputStream()
-                val encryptedBytes = inputStream.readBytes()
+                onProgress("Connected. Authenticating…")
+                // Generate ephemeral X25519 keypair (64 bytes: 32 pub + 32 priv)
+                keypair = CoreInterop.syncEphemeralKeygen()
+                    ?: return@withContext SyncResult.Failure("Failed to generate ephemeral keys")
+                val clientPub = keypair!!.copyOfRange(0, 32)
+                clientPriv = keypair!!.copyOfRange(32, 64)
 
-                if (encryptedBytes.isEmpty()) {
-                    val err = "Received empty data from desktop. Check if the desktop app is still running and the vault is not empty."
-                    Log.e(TAG, err)
-                    onProgress(err)
-                    key.fill(0)
-                    return@withContext false
+                // 1. Send Client Hello: [0x02 (1 byte), clientPub (32 bytes)]
+                val clientHello = ByteArray(33)
+                clientHello[0] = PROTOCOL_VERSION
+                System.arraycopy(clientPub, 0, clientHello, 1, 32)
+                out.write(clientHello)
+                out.flush()
+
+                // 2. Read Server Hello: [0x02 (1 byte), serverPub (32 bytes)]
+                val serverHello = readExact(inp, 33)
+                if (serverHello[0] != PROTOCOL_VERSION) {
+                    return@withContext SyncResult.Failure("Incompatible desktop protocol version: ${serverHello[0]}")
+                }
+                val serverPub = serverHello.copyOfRange(1, 33)
+
+                // 3. Derive AEAD session keys with PSK + X25519 shared secret
+                sessionHandle = CoreInterop.syncSessionDerive(
+                    role = 1, // CLIENT
+                    psk = psk,
+                    clientPub = clientPub,
+                    serverPub = serverPub,
+                    ownPriv = clientPriv!!
+                )
+                if (sessionHandle == 0L) {
+                    return@withContext SyncResult.Failure("Failed to establish secure session (key derivation error)")
                 }
 
-                onProgress("Decrypting vault (${encryptedBytes.size} bytes)...")
-                if (key.size != 32) {
-                    Log.e(TAG, "Invalid key size: ${key.size}")
-                    key.fill(0)
-                    return@withContext false
+                // 4. Key confirmation exchange
+                onProgress("Authenticated. Exchanging vaults…")
+                // Server sends CONFIRM first
+                val (serverFrameType, serverConfirmFrame) = readFrame(inp)
+                if (serverFrameType != CoreInterop.FRAME_CONFIRM) {
+                    return@withContext SyncResult.Failure("Protocol error: expected CONFIRM frame (got 0x${serverFrameType.toString(16)})")
+                }
+                val serverConfirmPayload = CoreInterop.syncFrameDecrypt(
+                    sessionHandle,
+                    CoreInterop.FRAME_CONFIRM,
+                    serverConfirmFrame
+                ) ?: return@withContext SyncResult.Failure("Authentication failed: invalid pairing key or corrupted data")
+
+                val localTranscript = CoreInterop.syncGetTranscriptHash(sessionHandle)
+                    ?: return@withContext SyncResult.Failure("Failed to compute transcript hash")
+
+                // MessageDigest.isEqual is constant-time (defense in depth; the
+                // transcript hash is not secret, but compare it the right way anyway).
+                if (!java.security.MessageDigest.isEqual(serverConfirmPayload, localTranscript)) {
+                    return@withContext SyncResult.Failure("Key confirmation mismatch: desktop pairing key does not match")
                 }
 
-                // Decrypt to a staging file instead of replacing immediately
-                val stagingDbPath = context.filesDir.absolutePath + "/vault_sync_staging.db"
-                val result = CoreInterop.syncDecryptVault(encryptedBytes, stagingDbPath, key)
+                // Client sends its CONFIRM frame
+                val clientConfirmFrame = CoreInterop.syncFrameEncrypt(
+                    sessionHandle,
+                    CoreInterop.FRAME_CONFIRM,
+                    localTranscript
+                ) ?: return@withContext SyncResult.Failure("Failed to encrypt confirmation frame")
+                out.write(clientConfirmFrame)
+                out.flush()
 
-                // Zero key immediately after use
-                key.fill(0)
+                // 5. Send local vault snapshot to server
+                onProgress("Sending local vault snapshot...")
+                val localSnapshot = CoreInterop.syncBuildLocalSnapshot()
+                    ?: return@withContext SyncResult.Failure("Failed to serialize local vault")
 
-                if (result == 0) {
-                    onProgress("Decryption successful! Preparing to finalize...")
-                    return@withContext true
-                } else {
-                    val err = "Decryption failed (native code $result). Key mismatch or corrupted data."
-                    Log.e(TAG, "Decryption failed with result: $result")
-                    onProgress(err)
+                val snapshotFrame = CoreInterop.syncFrameEncrypt(
+                    sessionHandle,
+                    CoreInterop.FRAME_SNAPSHOT,
+                    localSnapshot
+                )
+                localSnapshot.fill(0)
+                if (snapshotFrame == null) {
+                    return@withContext SyncResult.Failure("Failed to encrypt vault snapshot")
                 }
+                out.write(snapshotFrame)
+                out.flush()
+
+                // 6. Receive merged snapshot from server
+                onProgress("Waiting for server merge...")
+                val (mergedFrameType, mergedFrame) = readFrame(inp)
+                if (mergedFrameType != CoreInterop.FRAME_SNAPSHOT) {
+                    return@withContext SyncResult.Failure("Protocol error: expected SNAPSHOT frame (got 0x${mergedFrameType.toString(16)})")
+                }
+                val mergedBytes = CoreInterop.syncFrameDecrypt(
+                    sessionHandle,
+                    CoreInterop.FRAME_SNAPSHOT,
+                    mergedFrame
+                ) ?: return@withContext SyncResult.Failure("Failed to decrypt merged vault")
+
+                val mergedSnapshot = CoreInterop.syncUnpackSnapshot(mergedBytes)
+                mergedBytes.fill(0)
+                if (mergedSnapshot == null) {
+                    return@withContext SyncResult.Failure("Failed to deserialize merged vault")
+                }
+
+                // 7. Apply merged changes to the local vault
+                onProgress("Applying merged changes...")
+                val currentEntries = CoreInterop.databaseGetAllEntries()?.toList() ?: emptyList()
+                val currentMap = currentEntries.associateBy {
+                    "${it.service.lowercase()}:${it.username.lowercase()}"
+                }
+
+                var additions = 0
+                var updates = 0
+                var deletions = 0
+
+                // Add or update entries from the merged snapshot
+                for (entry in mergedSnapshot.entries) {
+                    val identity = "${entry.service.lowercase()}:${entry.username.lowercase()}"
+                    val existing = currentMap[identity]
+                    if (existing == null) {
+                        val rc = CoreInterop.databaseAddEntry(
+                            entry.service,
+                            entry.username,
+                            entry.password,
+                            entry.totpSecret,
+                            entry.recoveryCodes,
+                            entry.pwnedCount,
+                            entry.updatedAt
+                        )
+                        if (rc > 0) additions++
+                    } else if (!isDataIdentical(existing, entry)) {
+                        val rc = CoreInterop.databaseUpdateEntry(
+                            existing.id,
+                            entry.service,
+                            entry.username,
+                            entry.password,
+                            entry.totpSecret,
+                            entry.recoveryCodes,
+                            entry.pwnedCount,
+                            entry.updatedAt
+                        )
+                        if (rc == 0) updates++
+                    }
+                }
+
+                // Apply deletions based on tombstones
+                for (tomb in mergedSnapshot.tombstones) {
+                    val identity = "${tomb.service.lowercase()}:${tomb.username.lowercase()}"
+                    val existing = currentMap[identity]
+                    if (existing != null && existing.updatedAt <= tomb.deletedAt) {
+                        val rc = CoreInterop.databaseDeleteEntry(existing.id)
+                        if (rc == 0) deletions++
+                    }
+                }
+
+                // Wipe memory of incoming decrypted entries
+                mergedSnapshot.wipe()
+
+                // 7b. Send the local OpenPGP key store (SPSNAP03 section).
+                onProgress("Sending OpenPGP keys...")
+                val gpgSection = CoreInterop.syncBuildGpgSection()
+                if (gpgSection != null) {
+                    val gpgFrame = CoreInterop.syncFrameEncrypt(
+                        sessionHandle,
+                        CoreInterop.FRAME_GPG,
+                        gpgSection
+                    )
+                    gpgSection.fill(0)
+                    if (gpgFrame != null) {
+                        out.write(gpgFrame)
+                        out.flush()
+                    }
+                }
+
+                // 7c. Receive the merged OpenPGP key store and apply it.
+                onProgress("Receiving merged OpenPGP keys...")
+                val (mergedGpgType, mergedGpgFrame) = readFrame(inp)
+                if (mergedGpgType != CoreInterop.FRAME_GPG) {
+                    return@withContext SyncResult.Failure("Protocol error: expected GPG frame (got 0x${mergedGpgType.toString(16)})")
+                }
+                val mergedGpgBytes = CoreInterop.syncFrameDecrypt(
+                    sessionHandle,
+                    CoreInterop.FRAME_GPG,
+                    mergedGpgFrame
+                ) ?: return@withContext SyncResult.Failure("Failed to decrypt merged OpenPGP keys")
+
+                val mergedKeys = CoreInterop.syncParseGpgSection(mergedGpgBytes)
+                mergedGpgBytes.fill(0)
+                if (mergedKeys != null) {
+                    onProgress("Applying merged OpenPGP keys...")
+                    val localKeys = CoreInterop.gpgGetAll()?.toList() ?: emptyList()
+                    val localByLabel = localKeys.associateBy { it.label.lowercase() }
+                    val mergedLabels = mutableSetOf<String>()
+
+                    for (key in mergedKeys) {
+                        mergedLabels.add(key.label.lowercase())
+                        val existing = localByLabel[key.label.lowercase()]
+                        if (existing == null) {
+                            CoreInterop.gpgAdd(
+                                key.label, key.email, key.keyId,
+                                key.publicKey, key.privateKey
+                            )
+                            additions++
+                        } else if (existing.updatedAt != key.updatedAt ||
+                            existing.publicKey != key.publicKey ||
+                            existing.privateKey != key.privateKey
+                        ) {
+                            CoreInterop.gpgUpdate(
+                                existing.id, key.label, key.email, key.keyId,
+                                key.publicKey, key.privateKey
+                            )
+                            updates++
+                        }
+                    }
+
+                    // Keys absent from the merged store were deleted (or lost
+                    // the merge) on the desktop: apply those removals.
+                    for (local in localKeys) {
+                        if (local.label.lowercase() !in mergedLabels) {
+                            if (CoreInterop.gpgDelete(local.id) == 0) deletions++
+                        }
+                    }
+                }
+
+                // 8. Send ACK frame to desktop to conclude the session
+                onProgress("Finalizing sync...")
+                val ackFrame = CoreInterop.syncFrameEncrypt(
+                    sessionHandle,
+                    CoreInterop.FRAME_ACK,
+                    ByteArray(0)
+                )
+                if (ackFrame != null) {
+                    out.write(ackFrame)
+                    out.flush()
+                }
+
+                onProgress("Vault Sync complete!")
+                return@withContext SyncResult.Success(additions, updates, deletions)
             }
         } catch (e: java.net.SocketTimeoutException) {
             Log.e(TAG, "Sync timeout", e)
-            onProgress("Connection timeout. Ensure both devices are on the same WiFi and no firewall/VPN is blocking the connection (Port: $port).")
-            key.fill(0)
+            return@withContext SyncResult.Failure("Connection timed out. Check firewall and ensure both devices are on the same network.")
         } catch (e: java.net.ConnectException) {
-            Log.e(TAG, "Sync connection refused", e)
-            onProgress("Connection refused. Check if the Desktop sync server is active and listening on $ip.")
-            key.fill(0)
+            Log.e(TAG, "Connection refused", e)
+            return@withContext SyncResult.Failure("Connection refused by $ip:$port. Ensure Desktop sync is active.")
         } catch (e: Exception) {
-            Log.e(TAG, "Sync failed", e)
-            onProgress("Sync error: ${e.message ?: "Unknown error"}")
-            key.fill(0)
-        }
-        return@withContext false
-    }
-
-    fun finalizeSyncReplacement(context: Context): Boolean {
-        try {
-            val stagingDb = java.io.File(context.filesDir, "vault_sync_staging.db")
-            val stagingSalt = java.io.File(context.filesDir, "vault_sync_staging.db.salt")
-
-            val targetDb = java.io.File(context.filesDir, "vault.db")
-            val targetSalt = java.io.File(context.filesDir, "vault.db.salt")
-
-            if (stagingDb.exists() && stagingSalt.exists()) {
-                Log.d(TAG, "Finalizing sync replacement. Staging DB size: ${stagingDb.length()}")
-
-                // Nuclear option: delete old files first to ensure no locks
-                if (targetDb.exists()) targetDb.delete()
-                if (targetSalt.exists()) targetSalt.delete()
-
-                stagingDb.copyTo(targetDb, overwrite = true)
-                stagingSalt.copyTo(targetSalt, overwrite = true)
-
-                stagingDb.delete()
-                stagingSalt.delete()
-
-                Log.d(TAG, "Sync finalization complete.")
-                return true
-            } else {
-                Log.e(TAG, "Staging files missing during finalization!")
+            Log.e(TAG, "Sync error", e)
+            return@withContext SyncResult.Failure("Sync error: ${e.message ?: "Unknown error"}")
+        } finally {
+            if (sessionHandle != 0L) {
+                CoreInterop.syncSessionFree(sessionHandle)
             }
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to finalize sync replacement", e)
+            clientPriv?.fill(0)
+            keypair?.fill(0)
+            psk.fill(0)
         }
-        return false
     }
 
-    private fun hexToBytes(hex: String): ByteArray {
-        val result = ByteArray(hex.length / 2)
-        for (i in result.indices) {
-            result[i] = hex.substring(i * 2, i * 2 + 2).toInt(16).toByte()
+    private fun isDataIdentical(local: PasswordEntry, incoming: PasswordEntry): Boolean {
+        return local.password.contentEquals(incoming.password) &&
+                local.totpSecret.contentEquals(incoming.totpSecret) &&
+                local.recoveryCodes.contentEquals(incoming.recoveryCodes)
+    }
+
+    private fun readExact(inp: InputStream, count: Int): ByteArray {
+        val buf = ByteArray(count)
+        var read = 0
+        while (read < count) {
+            val n = inp.read(buf, read, count - read)
+            if (n < 0) throw EOFException("Premature end of stream while reading $count bytes (read $read)")
+            read += n
         }
-        return result
+        return buf
+    }
+
+    private fun readFrame(inp: InputStream): Pair<Int, ByteArray> {
+        val header = readExact(inp, 5)
+        val type = header[0].toInt() and 0xFF
+        val ctLen = ((header[1].toInt() and 0xFF) shl 24) or
+                ((header[2].toInt() and 0xFF) shl 16) or
+                ((header[3].toInt() and 0xFF) shl 8) or
+                (header[4].toInt() and 0xFF)
+
+        if (ctLen < 16 || ctLen > 16 * 1024 * 1024) {
+            throw IllegalArgumentException("Invalid frame length: $ctLen")
+        }
+
+        val body = readExact(inp, ctLen)
+        val frame = ByteArray(5 + ctLen)
+        System.arraycopy(header, 0, frame, 0, 5)
+        System.arraycopy(body, 0, frame, 5, ctLen)
+        return Pair(type, frame)
     }
 }

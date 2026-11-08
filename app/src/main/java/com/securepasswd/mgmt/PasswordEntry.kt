@@ -9,7 +9,8 @@ data class PasswordEntry(
     val password: ByteArray = byteArrayOf(),
     val totpSecret: ByteArray = byteArrayOf(),
     val recoveryCodes: ByteArray = byteArrayOf(),
-    val pwnedCount: Int = -1
+    val pwnedCount: Int = -1,
+    val updatedAt: Long = 0L
 ) {
     fun wipe() {
         password.fill(0)
