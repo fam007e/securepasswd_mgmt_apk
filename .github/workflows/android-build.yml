@@ -1,0 +1,73 @@
+name: Android CI
+
+on:
+  push:
+    branches: [ "main" ]
+    tags-ignore:
+      - '**'
+  pull_request:
+    branches: [ "main" ]
+
+# Runner budget: codeberg-medium caps jobs at 10 minutes (4 CPU / 8 GB),
+# which this project cannot fit — AGP configures/downloads the NDK even
+# for :app:testDebugUnitTest (ndkVersion is set), and the vendored
+# OpenSSL/SQLCipher native build takes ~7.5 min on top. So CI runs as a
+# single job on codeberg-medium-lazy (long jobs allowed, slower pickup).
+#
+# Memory flags: rootless-podman containers die under RAM pressure when
+# the Gradle daemon + Kotlin daemon + CMake workers stack up (seen as
+# "context deadline exceeded" on the podman socket), so the daemon is
+# disabled, workers capped and the Kotlin compiler runs in-process.
+
+jobs:
+  build:
+    runs-on: codeberg-medium-lazy
+    timeout-minutes: 60
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        cache: gradle
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        # NDK pre-installed here: Gradle would otherwise auto-download it
+        # during configuration of even pure-JVM tasks.
+        packages: 'platform-tools build-tools;35.0.0 platforms;android-36 ndk;25.1.8937393 cmake;3.22.1'
+
+    - name: Create local.properties
+      run: |
+        SDK_PATH="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+        echo "sdk.dir=$SDK_PATH" > local.properties
+        echo "ndk.version=25.1.8937393" >> local.properties
+
+    - name: Grant execute permission for gradlew
+      run: chmod +x gradlew
+
+    - name: Run Unit Tests
+      run: >-
+        ./gradlew :app:testDebugUnitTest --dependency-verification strict
+        --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g
+        -Pkotlin.compiler.execution.strategy=in-process
+
+    - name: Build Debug APK
+      env:
+        SOURCE_DATE_EPOCH: "1711075200"
+      run: >-
+        ./gradlew :app:assembleDebug -Pandroid.injected.abi.requested=arm64-v8a
+        --dependency-verification strict --stacktrace --no-daemon --max-workers=2
+        -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-debug
+        path: app/build/outputs/apk/debug/*.apk
