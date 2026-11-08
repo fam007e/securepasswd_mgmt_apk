@@ -51,6 +51,7 @@ fun VaultScreen(
     palette: String = "nord",
     onSelectPalette: (String) -> Unit = {},
     onOpenGpgKeys: () -> Unit = {},
+    onOpenAppIcon: () -> Unit = {},
     totpViewModel: TotpViewModel = viewModel()
 ) {
     val refreshTrigger by totpViewModel.refreshTrigger.collectAsState()
@@ -294,6 +295,13 @@ fun VaultScreen(
                                     onClick = {
                                         showMenu = false
                                         onOpenGpgKeys()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text("App Icon") },
+                                    onClick = {
+                                        showMenu = false
+                                        onOpenAppIcon()
                                     }
                                 )
                                 DropdownMenuItem(

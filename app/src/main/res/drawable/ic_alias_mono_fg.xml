@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#1C1C1E"
+        android:pathData="M0,0h108v108h-108z" />
+    <!-- Minimalist locked-diary glyph, white on near-black -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3"
+        android:pathData="M37,38 h28 a5,5 0 0 1 5,5 v22 a5,5 0 0 1 -5,5 h-28 a5,5 0 0 1 -5,-5 v-22 a5,5 0 0 1 5,-5 z" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M40,47 h14 M40,53 h14" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M50,54 m-2.5,0 a2.5,2.5 0 1 0 5,0 a2.5,2.5 0 1 0 -5,0" />
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M50,54 v7" />
+</vector>

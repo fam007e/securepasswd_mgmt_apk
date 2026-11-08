@@ -288,7 +288,8 @@ fun AppNavigation(
                 onToggleTheme = onToggleTheme,
                 palette = palette,
                 onSelectPalette = onSelectPalette,
-                onOpenGpgKeys = { currentScreen = Screen.GpgKeys }
+                onOpenGpgKeys = { currentScreen = Screen.GpgKeys },
+                onOpenAppIcon = { currentScreen = Screen.AppIcon }
             )
         }
         is Screen.AddEntry -> {
@@ -378,6 +379,11 @@ fun AppNavigation(
                 onBack = { currentScreen = Screen.Vault }
             )
         }
+        is Screen.AppIcon -> {
+            com.securepasswd.mgmt.ui.AppIconScreen(
+                onBack = { currentScreen = Screen.Vault }
+            )
+        }
         is Screen.MergeReview -> {
             com.securepasswd.mgmt.ui.MergeReviewScreen(
                 report = screen.report,
@@ -422,6 +428,7 @@ sealed class Screen {
     object AddEntry : Screen()
     object Sync : Screen()
     object GpgKeys : Screen()
+    object AppIcon : Screen()
     data class MergeReview(val report: MergeReport) : Screen()
     data class Details(val entry: PasswordEntry) : Screen()
     data class EditEntry(val entry: PasswordEntry) : Screen()
