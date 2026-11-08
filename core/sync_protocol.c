@@ -981,7 +981,7 @@ int sync_merge_gpg_keys(const sync_gpg_key_t *local_keys, int local_count,
         if (!rk->label) continue;
         const sync_gpg_key_t *lk = NULL;
         for (int j = 0; j < local_count; j++) {
-            if (local_keys[j].label &&
+            if (local_keys[j].label && rk->label &&
                 strcasecmp(local_keys[j].label, rk->label) == 0) {
                 lk = &local_keys[j];
                 break;
@@ -1027,7 +1027,7 @@ int sync_merge_gpg_keys(const sync_gpg_key_t *local_keys, int local_count,
         const sync_gpg_key_t *lk = &local_keys[i];
         int found = 0;
         for (int j = 0; j < remote_count; j++) {
-            if (remote_keys[j].label &&
+            if (remote_keys[j].label && lk->label &&
                 strcasecmp(remote_keys[j].label, lk->label) == 0) {
                 found = 1;
                 break;
