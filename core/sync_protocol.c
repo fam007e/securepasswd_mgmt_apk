@@ -883,6 +883,7 @@ int sync_gpg_deserialize(const uint8_t *data, size_t len,
  * entry tombstone table with service == "GPG". */
 static const sync_tombstone_t *sp_find_gpg_tombstone(const sync_tombstone_t *ts, int count,
                                                      const char *label) {
+    if (!label) return NULL; /* NULL-label keys are unmatchable by contract */
     for (int i = 0; i < count; i++) {
         if (ts[i].service &&
             strcasecmp(ts[i].service, "GPG") == 0 &&
@@ -975,9 +976,12 @@ int sync_merge_gpg_keys(const sync_gpg_key_t *local_keys, int local_count,
 
     for (int i = 0; i < remote_count; i++) {
         const sync_gpg_key_t *rk = &remote_keys[i];
+        /* The label is the merge identity; a key without one can never be
+         * matched or tracked by tombstones, so it is never propagated. */
+        if (!rk->label) continue;
         const sync_gpg_key_t *lk = NULL;
         for (int j = 0; j < local_count; j++) {
-            if (local_keys[j].label &&
+            if (local_keys[j].label && rk->label &&
                 strcasecmp(local_keys[j].label, rk->label) == 0) {
                 lk = &local_keys[j];
                 break;
@@ -1023,7 +1027,7 @@ int sync_merge_gpg_keys(const sync_gpg_key_t *local_keys, int local_count,
         const sync_gpg_key_t *lk = &local_keys[i];
         int found = 0;
         for (int j = 0; j < remote_count; j++) {
-            if (remote_keys[j].label &&
+            if (remote_keys[j].label && lk->label &&
                 strcasecmp(remote_keys[j].label, lk->label) == 0) {
                 found = 1;
                 break;
