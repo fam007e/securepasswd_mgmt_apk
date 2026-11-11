@@ -590,7 +590,10 @@ static int sp_entry_data_eq(const sync_entry_t *a, const sync_entry_t *b) {
     if (a->updated_at != b->updated_at) return 0;
     /* Service/username are the identity (matched case-insensitively by the
      * caller); data equality covers the actual record content. */
+    /* Pointer arrays for comparison only — no copy occurs here. */
+    /* flawfinder: ignore */
     const char *fa[3] = { a->password, a->totp_secret, a->recovery_codes };
+    /* flawfinder: ignore */
     const char *fb[3] = { b->password, b->totp_secret, b->recovery_codes };
     for (int i = 0; i < 3; i++) {
         const char *x = fa[i] ? fa[i] : "";
@@ -604,7 +607,10 @@ static int sp_entry_data_eq(const sync_entry_t *a, const sync_entry_t *b) {
  * Used only as a deterministic tie-break when updated_at is equal.
  * Secrets are compared first so the tie-break is dominated by content. */
 static int sp_entry_content_cmp(const sync_entry_t *a, const sync_entry_t *b) {
+    /* Pointer arrays for comparison only — no copy occurs here. */
+    /* flawfinder: ignore */
     const char *fa[5] = { a->service, a->username, a->password, a->totp_secret, a->recovery_codes };
+    /* flawfinder: ignore */
     const char *fb[5] = { b->service, b->username, b->password, b->totp_secret, b->recovery_codes };
     static const int order[5] = { 2, 3, 4, 0, 1 }; /* password, totp, recovery, service, username */
     for (int k = 0; k < 5; k++) {
@@ -877,6 +883,7 @@ int sync_gpg_deserialize(const uint8_t *data, size_t len,
  * entry tombstone table with service == "GPG". */
 static const sync_tombstone_t *sp_find_gpg_tombstone(const sync_tombstone_t *ts, int count,
                                                      const char *label) {
+    if (!label) return NULL; /* NULL-label keys are unmatchable by contract */
     for (int i = 0; i < count; i++) {
         if (ts[i].service &&
             strcasecmp(ts[i].service, "GPG") == 0 &&
@@ -888,7 +895,10 @@ static const sync_tombstone_t *sp_find_gpg_tombstone(const sync_tombstone_t *ts,
 }
 
 static int sp_gpg_content_cmp(const sync_gpg_key_t *a, const sync_gpg_key_t *b) {
+    /* Pointer arrays for comparison only — no copy occurs here. */
+    /* flawfinder: ignore */
     const char *fa[5] = { a->private_key, a->public_key, a->key_id, a->email, a->label };
+    /* flawfinder: ignore */
     const char *fb[5] = { b->private_key, b->public_key, b->key_id, b->email, b->label };
     for (int i = 0; i < 5; i++) {
         int c = strcmp(fa[i] ? fa[i] : "", fb[i] ? fb[i] : "");
@@ -941,7 +951,10 @@ void sync_gpg_merge_report_free(sync_gpg_merge_report_t *report) {
 
 static int sp_gpg_data_eq(const sync_gpg_key_t *a, const sync_gpg_key_t *b) {
     if (a->updated_at != b->updated_at) return 0;
+    /* Pointer arrays for comparison only — no copy occurs here. */
+    /* flawfinder: ignore */
     const char *fa[4] = { a->email, a->key_id, a->public_key, a->private_key };
+    /* flawfinder: ignore */
     const char *fb[4] = { b->email, b->key_id, b->public_key, b->private_key };
     for (int i = 0; i < 4; i++) {
         if (strcmp(fa[i] ? fa[i] : "", fb[i] ? fb[i] : "") != 0) return 0;
@@ -963,9 +976,12 @@ int sync_merge_gpg_keys(const sync_gpg_key_t *local_keys, int local_count,
 
     for (int i = 0; i < remote_count; i++) {
         const sync_gpg_key_t *rk = &remote_keys[i];
+        /* The label is the merge identity; a key without one can never be
+         * matched or tracked by tombstones, so it is never propagated. */
+        if (!rk->label) continue;
         const sync_gpg_key_t *lk = NULL;
         for (int j = 0; j < local_count; j++) {
-            if (local_keys[j].label &&
+            if (local_keys[j].label && rk->label &&
                 strcasecmp(local_keys[j].label, rk->label) == 0) {
                 lk = &local_keys[j];
                 break;
@@ -1011,7 +1027,7 @@ int sync_merge_gpg_keys(const sync_gpg_key_t *local_keys, int local_count,
         const sync_gpg_key_t *lk = &local_keys[i];
         int found = 0;
         for (int j = 0; j < remote_count; j++) {
-            if (remote_keys[j].label &&
+            if (remote_keys[j].label && lk->label &&
                 strcasecmp(remote_keys[j].label, lk->label) == 0) {
                 found = 1;
                 break;

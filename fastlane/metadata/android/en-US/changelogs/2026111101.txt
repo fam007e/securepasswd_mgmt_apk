@@ -1,0 +1,4 @@
+Sync protocol hardening: guard NULL key labels during OpenPGP key-store
+merges, rejecting unmatchable entries. Validate decoded TOTP secrets.
+Static analysis suppressions aligned with desktop. Release packaging and
+F-Droid metadata updates for v2026.11.11.
