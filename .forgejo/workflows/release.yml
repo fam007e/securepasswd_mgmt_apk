@@ -1,9 +1,11 @@
 name: Release Build
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:   # manual only — GitHub Actions handles release builds
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v2026.11.11)'
+        required: true
 
 concurrency:
   group: release-${{ github.ref }}
