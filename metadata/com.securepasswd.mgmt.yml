@@ -10,16 +10,16 @@ IssueTracker: https://codeberg.org/fam007e/securepasswd_mgmt_apk/issues
 AutoName: SecurePasswd MGMT
 
 RepoType: git
-Repo: https://codeberg.org/fam007e/securepasswd_mgmt_apk
-Binaries: 
-  https://codeberg.org/fam007e/securepasswd_mgmt_apk/releases/download/v%v/securepasswd-universal.apk
+Repo: https://github.com/fam007e/securepasswd_mgmt_apk
+Binaries:
+  https://github.com/fam007e/securepasswd_mgmt_apk/releases/download/v%v/securepasswd-universal.apk
 
 Builds:
-  - versionName: 2026.11.08
-    versionCode: 2026110801
-    # TODO: replace with the real commit hash after tagging v2026.11.08
-    # (git rev-list -n1 v2026.11.08)
-    commit: v2026.11.08
+  - versionName: 2026.11.11
+    versionCode: 2026111101
+    # TODO: replace with the real commit hash after tagging v2026.11.11
+    # (git rev-list -n1 v2026.11.11)
+    commit: v2026.11.11
     subdir: app
     gradle:
       - yes
@@ -29,10 +29,10 @@ Builds:
       - enableSplits
       - target.abis=arm64-v8a,armeabi-v7a
 
-AllowedAPKSigningKeys: 
+AllowedAPKSigningKeys:
   3733b649da5bfaeb3d4e48ddac312875557f6023f45236a54f8ce22ec04531f1
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 2026.11.08
-CurrentVersionCode: 2026110801
+CurrentVersion: 2026.11.11
+CurrentVersionCode: 2026111101

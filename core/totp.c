@@ -55,6 +55,11 @@ char* generate_totp_code_at_time(const char *base32_secret, time_t current_time)
     if (!decoded_secret) return NULL;
 
     int actual_len = base32_decode((const uint8_t*)base32_secret, decoded_secret, decoded_len);
+    if (actual_len <= 0) {
+        sodium_memzero(decoded_secret, decoded_len);
+        free(decoded_secret);
+        return NULL;
+    }
 
     uint64_t time_step = htobe64((uint64_t)current_time / 30);
 

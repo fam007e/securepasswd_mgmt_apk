@@ -22,11 +22,11 @@ Jetpack Compose UI with a native C core (SQLCipher, Argon2id, OpenSSL).
 - No trackers, ads, GMS, API keys, or runtime binary downloads;
   `allowBackup=false`, no cleartext traffic, vault excluded from backups
 - Reproducible-builds / Verified Builds support:
-  - release APKs signed with `apksigner` (CI: Forgejo Actions)
+  - release APKs signed with `apksigner` (CI: GitHub Actions & Forgejo Actions)
   - `vcsInfo.include=false`, pinned `SOURCE_DATE_EPOCH`, NDK path remapping
     (`-ffile-prefix-map`), `-Wl,--build-id=none`
   - `AllowedAPKSigningKeys` pins the developer signing cert
-  - `Binaries:` points at the Codeberg release APKs built by CI
+  - `Binaries:` points at the release APKs built by CI (hosted on GitHub releases)
   - CI builds every release **twice** in a clean workspace and refuses to
     publish on checksum mismatch; `SHA256SUMS` is published with each release
   - Gradle dependency verification (871 artifacts pinned, strict mode in CI)
@@ -34,5 +34,5 @@ Jetpack Compose UI with a native C core (SQLCipher, Argon2id, OpenSSL).
 - Fastlane metadata (title, short/full description, changelogs) lives in the
   upstream repo; screenshots are being added
 
-**Versions:** first build entry is 2026.05.30 / 2026053001; AutoUpdateMode:
+**Versions:** first build entry is 2026.11.11 / 2026111101; AutoUpdateMode:
 Version with UpdateCheckMode: Tags.

@@ -55,7 +55,7 @@ jobs:
     - name: Run Unit Tests
       run: >-
         ./gradlew :app:testDebugUnitTest --dependency-verification strict
-        --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx3g
+        --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=-Xmx2048m
         -Pkotlin.compiler.execution.strategy=in-process
 
     - name: Build Debug APK
@@ -64,10 +64,10 @@ jobs:
       run: >-
         ./gradlew :app:assembleDebug -Pandroid.injected.abi.requested=arm64-v8a
         --dependency-verification strict --stacktrace --no-daemon --max-workers=2
-        -Dorg.gradle.jvmargs=-Xmx3g -Pkotlin.compiler.execution.strategy=in-process
+        -Dorg.gradle.jvmargs=-Xmx2048m -Pkotlin.compiler.execution.strategy=in-process
 
     - name: Upload APK
-      uses: https://github.com/actions/upload-artifact@v4
+      uses: https://github.com/actions/upload-artifact@v3
       with:
         name: app-debug
         path: app/build/outputs/apk/debug/*.apk
