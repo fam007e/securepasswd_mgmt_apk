@@ -121,10 +121,11 @@ TODO before opening the fdroiddata MR:
 - [x] Metadata canonicalized with `fdroid rewritemeta` (AntiFeatures and
       AllowedAPKSigningKeys in list form; inline comments do not survive
       rewritemeta — keep explanations in the MR description)
-- [ ] Tag `v2026.11.11`, then replace `commit: v2026.11.11` in
+- [x] Tag `v2026.11.11`, then replace `commit: v2026.11.11` in
       `metadata/com.securepasswd.mgmt.yml` with the exact 40-char commit hash
-- [ ] Replace the upscaled 192px `icon.png` with a real 512x512 export of the
-      SVG source
+      (`e958644a4d725e73db9e0faaa481a325baea2527`)
+- [x] Replace the upscaled 192px `icon.png` with a real 512x512 export of the
+      SVG source (verified 512x512 RGBA)
 - [ ] Add 1–8 phone screenshots (PNG) to
       `fastlane/metadata/android/en-US/images/phoneScreenshots/`
 - [x] Vendored OpenSSL is 3.3.7 (Apache-2.0, bumped from 3.3.2; verified
