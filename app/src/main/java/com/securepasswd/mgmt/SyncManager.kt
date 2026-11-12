@@ -199,18 +199,19 @@ object SyncManager {
                 // 7b. Send the local OpenPGP key store (SPSNAP03 section).
                 onProgress("Sending OpenPGP keys...")
                 val gpgSection = CoreInterop.syncBuildGpgSection()
-                if (gpgSection != null) {
-                    val gpgFrame = CoreInterop.syncFrameEncrypt(
-                        sessionHandle,
-                        CoreInterop.FRAME_GPG,
-                        gpgSection
-                    )
-                    gpgSection.fill(0)
-                    if (gpgFrame != null) {
-                        out.write(gpgFrame)
-                        out.flush()
-                    }
+                    ?: return@withContext SyncResult.Failure("Failed to serialize OpenPGP key store")
+
+                val gpgFrame = CoreInterop.syncFrameEncrypt(
+                    sessionHandle,
+                    CoreInterop.FRAME_GPG,
+                    gpgSection
+                )
+                gpgSection.fill(0)
+                if (gpgFrame == null) {
+                    return@withContext SyncResult.Failure("Failed to encrypt OpenPGP key store")
                 }
+                out.write(gpgFrame)
+                out.flush()
 
                 // 7c. Receive the merged OpenPGP key store and apply it.
                 onProgress("Receiving merged OpenPGP keys...")
