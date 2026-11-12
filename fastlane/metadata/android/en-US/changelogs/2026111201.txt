@@ -1,0 +1,3 @@
+Sync protocol resilience: fail-fast on OpenPGP key serialization
+or encryption errors to prevent sync protocol deadlocks.
+Release packaging and F-Droid metadata updates for v2026.11.12.

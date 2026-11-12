@@ -15,9 +15,11 @@ Binaries:
   https://github.com/fam007e/securepasswd_mgmt_apk/releases/download/v%v/securepasswd-universal.apk
 
 Builds:
-  - versionName: 2026.11.11
-    versionCode: 2026111101
-    commit: e958644a4d725e73db9e0faaa481a325baea2527
+  - versionName: 2026.11.12
+    versionCode: 2026111201
+    # TODO: replace with the real commit hash after tagging v2026.11.12
+    # (git rev-list -n1 v2026.11.12)
+    commit: v2026.11.12
     subdir: app
     gradle:
       - yes
@@ -32,5 +34,5 @@ AllowedAPKSigningKeys:
 
 AutoUpdateMode: Version
 UpdateCheckMode: Tags
-CurrentVersion: 2026.11.11
-CurrentVersionCode: 2026111101
+CurrentVersion: 2026.11.12
+CurrentVersionCode: 2026111201

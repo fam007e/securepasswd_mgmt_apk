@@ -34,5 +34,5 @@ Jetpack Compose UI with a native C core (SQLCipher, Argon2id, OpenSSL).
 - Fastlane metadata (title, short/full description, changelogs) lives in the
   upstream repo; screenshots are being added
 
-**Versions:** first build entry is 2026.11.11 / 2026111101; AutoUpdateMode:
+**Versions:** first build entry is 2026.11.12 / 2026111201; AutoUpdateMode:
 Version with UpdateCheckMode: Tags.

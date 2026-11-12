@@ -121,9 +121,9 @@ TODO before opening the fdroiddata MR:
 - [x] Metadata canonicalized with `fdroid rewritemeta` (AntiFeatures and
       AllowedAPKSigningKeys in list form; inline comments do not survive
       rewritemeta — keep explanations in the MR description)
-- [x] Tag `v2026.11.11`, then replace `commit: v2026.11.11` in
+- [ ] Tag `v2026.11.12`, then replace `commit: v2026.11.12` in
       `metadata/com.securepasswd.mgmt.yml` with the exact 40-char commit hash
-      (`e958644a4d725e73db9e0faaa481a325baea2527`)
+      (`git rev-list -n1 v2026.11.12`)
 - [x] Replace the upscaled 192px `icon.png` with a real 512x512 export of the
       SVG source (verified 512x512 RGBA)
 - [ ] Add 1–8 phone screenshots (PNG) to
