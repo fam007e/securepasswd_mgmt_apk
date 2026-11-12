@@ -17,9 +17,7 @@ Binaries:
 Builds:
   - versionName: 2026.11.12
     versionCode: 2026111201
-    # TODO: replace with the real commit hash after tagging v2026.11.12
-    # (git rev-list -n1 v2026.11.12)
-    commit: v2026.11.12
+    commit: 006c138685cadc690fc5dc01de567e5c3c577055
     subdir: app
     gradle:
       - yes
